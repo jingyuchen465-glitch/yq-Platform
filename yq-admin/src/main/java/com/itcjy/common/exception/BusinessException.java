@@ -1,0 +1,43 @@
+package com.itcjy.common.exception;
+
+import lombok.Getter;
+
+@Getter
+public class BusinessException extends RuntimeException {
+
+    private final Integer code;
+
+    public static final BusinessException USER_EXIST = new BusinessException(10001, "User already exists");
+    public static final BusinessException USER_NOT_EXIST = new BusinessException(10002, "User not found");
+    public static final BusinessException PERMISSION_EXIST = new BusinessException(11001, "Permission already exists");
+    public static final BusinessException PERMISSION_NOT_EXIST = new BusinessException(11002, "Permission not found");
+    public static final BusinessException PARAMS_ERROR = new BusinessException(11005, "Invalid parameters");
+    public static final BusinessException PASSWORD_ERROR = new BusinessException(11003, "Password incorrect");
+    public static final BusinessException DATA_EXIST = new BusinessException(11006, "Data already exists");
+    public static final BusinessException DATA_ERROR = new BusinessException(11004, "Data error");
+    public static final BusinessException ROLE_EXIST = new BusinessException(12001, "Role already exists");
+    public static final BusinessException ROLE_NOT_EXIST = new BusinessException(12002, "Role not found");
+    public static final BusinessException CONFIG_EXIST = new BusinessException(13001, "Config already exists");
+    public static final BusinessException CONFIG_NOT_EXIST = new BusinessException(13002, "Config not found");
+    public static final BusinessException CAMPUS_NOT_EXIST = new BusinessException(14001, "Campus not found");
+    public static final BusinessException COURSE_NOT_EXIST = new BusinessException(15001, "Course not found");
+    public static final BusinessException COURSE_DETAIL_NOT_EXIST = new BusinessException(15002, "Course detail not found");
+    public static final BusinessException CLAZZ_NOT_EXIST = new BusinessException(16001, "Class not found");
+    public static final BusinessException PRODUCT_NOT_EXIST = new BusinessException(17001, "Product not found");
+    public static final BusinessException PREPAY_ORDER_NOT_EXIST = new BusinessException(17002, "Prepay order not found");
+    public static final BusinessException REMOTE_ERROR = new BusinessException(17003, "Remote call failed");
+
+    public BusinessException(String message) {
+        super(message);
+        this.code = 400;
+    }
+
+    public BusinessException(Integer code, String message) {
+        super(message);
+        this.code = code;
+    }
+
+    public BusinessException newInstance(String message) {
+        return new BusinessException(this.getCode(), message);
+    }
+}
