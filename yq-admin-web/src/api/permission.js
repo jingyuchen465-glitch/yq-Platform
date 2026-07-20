@@ -30,3 +30,12 @@ export function getPermission(id) {
     method: 'get'
   })
 }
+
+// 切换权限状态
+export function updatePermissionStatus(id, status) {
+  return request({
+    url: `/emp/sysPermission/updateStatus/${id}`,
+    method: 'put',
+    params: { status }
+  })
+}

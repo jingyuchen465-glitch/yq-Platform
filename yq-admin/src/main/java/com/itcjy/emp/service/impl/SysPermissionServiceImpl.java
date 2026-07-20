@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.mapper.SysPermissionMapper;
 import com.itcjy.emp.pojo.entity.SysPermission;
@@ -13,6 +14,7 @@ import com.itcjy.emp.pojo.req.SysPermissionPageReq;
 import com.itcjy.emp.service.ISysPermissionService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -37,5 +39,16 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 .like(StrUtil.isNotBlank(req.getApiPath()), SysPermission::getApiPath, req.getApiPath())
                 .eq(StrUtil.isNotBlank(req.getStatus()), SysPermission::getStatus, req.getStatus())
                 .orderByAsc(SysPermission::getPermissionCode);
+    }
+
+    @Override
+    public void updateStatus(Long id, String status) {
+        SysPermission permission = this.getById(id);
+        if (permission == null) {
+            throw BusinessException.PERMISSION_NOT_EXIST.newInstance("权限不存在");
+        }
+        permission.setStatus(status);
+        permission.setUpdatedAt(LocalDateTime.now());
+        this.updateById(permission);
     }
 }

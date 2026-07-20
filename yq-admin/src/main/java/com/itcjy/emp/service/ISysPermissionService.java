@@ -18,4 +18,9 @@ public interface ISysPermissionService extends IService<SysPermission> {
      * 分页查询权限。
      */
     PageResult<SysPermission> pagePermissions(SysPermissionPageReq req);
+
+    /**
+     * 更新权限状态（启用/禁用）
+     */
+    void updateStatus(Long id, String status);
 }

@@ -17,7 +17,9 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -55,5 +57,16 @@ public class SysPermissionController {
             throw BusinessException.PERMISSION_NOT_EXIST.newInstance("权限不存在");
         }
         return ApiResponse.success(permission);
+    }
+
+    @Operation(summary = "切换权限状态", description = "启用或禁用指定接口权限")
+    @PutMapping("/updateStatus/{id}")
+    @HasPermission(code = "sys:permission:updateStatus", name = "切换权限状态", description = "启用或禁用系统接口权限")
+    public ApiResponse<Void> updatePermissionStatus(@Parameter(description = "权限ID", required = true)
+                                                    @PathVariable @NotNull(message = "权限ID不能为空") Long id,
+                                                    @Parameter(description = "状态：ACTIVE/INACTIVE", required = true)
+                                                    @RequestParam @NotNull(message = "状态不能为空") String status) {
+        sysPermissionService.updateStatus(id, status);
+        return ApiResponse.success("状态更新成功");
     }
 }

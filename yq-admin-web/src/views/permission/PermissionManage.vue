@@ -51,15 +51,16 @@
           <template slot-scope="{ row }"><code class="mono">{{ row.apiPath }}</code></template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="90" align="center">
+        <el-table-column prop="status" label="状态" width="80" align="center">
           <template slot-scope="{ row }">
-            <span class="st" :class="row.status === 'ACTIVE' ? 'on' : 'off'">
-              <i></i>{{ row.status === 'ACTIVE' ? '启用' : '禁用' }}
-            </span>
+            <el-switch
+              :value="row.status === 'ACTIVE'"
+              @change="(val) => handleStatusChange(row, val)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="160" align="center">
-          <template slot-scope="{ row }"><code class="mono">{{ row.createdAt }}</code></template>
+        <el-table-column label="创建时间" width="180" align="center">
+          <template slot-scope="{ row }"><code class="mono" style="white-space: nowrap;">{{ row.createdAt }}</code></template>
         </el-table-column>
         <el-table-column label="操作" width="90" align="center" fixed="right">
           <template slot-scope="{ row }">
@@ -103,7 +104,7 @@
 </template>
 
 <script>
-import { pagePermissions, getPermission } from '@/api/permission'
+import { pagePermissions, getPermission, updatePermissionStatus } from '@/api/permission'
 
 export default {
   name: 'PermissionManage',
@@ -150,6 +151,22 @@ export default {
       const res = await getPermission(row.id)
       this.detailData = res.data
       this.detailVisible = true
+    },
+    async handleStatusChange(row, val) {
+      const newStatus = val ? 'ACTIVE' : 'INACTIVE'
+      const action = val ? '启用' : '禁用'
+      try {
+        await this.$confirm(`确定要${action}接口「${row.permissionName}」吗？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        await updatePermissionStatus(row.id, newStatus)
+        this.$message.success(`${action}成功`)
+        row.status = newStatus
+      } catch (e) {
+        // 用户取消或接口失败，不做任何操作
+      }
     }
   }
 }
