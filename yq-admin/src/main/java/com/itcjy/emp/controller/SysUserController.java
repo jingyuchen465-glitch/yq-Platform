@@ -8,6 +8,7 @@ import com.itcjy.emp.service.ISysUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +25,7 @@ public class SysUserController {
 
     @Operation(summary = "添加员工", description = "新增员工用户信息")
     @RequestMapping("/add")
-    public ApiResponse<Void> addSysUser(@RequestBody SysUserReq req) {
+    public ApiResponse<Void> addSysUser(@Valid @RequestBody SysUserReq req) {
         SysUser sysUser = BeanUtil.copyProperties(req, SysUser.class);
         sysUserService.save(sysUser);
         return ApiResponse.success();
