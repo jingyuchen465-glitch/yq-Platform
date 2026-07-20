@@ -5,6 +5,10 @@ import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.pojo.entity.SysUser;
 import com.itcjy.emp.pojo.req.SysUserPageReq;
 import com.itcjy.emp.pojo.req.SysUserReq;
+import com.itcjy.emp.pojo.req.SysUserUpdateReq;
+import com.itcjy.emp.pojo.res.SysUserRes;
+
+import java.util.List;
 
 public interface ISysUserService extends IService<SysUser> {
 
@@ -24,12 +28,17 @@ public interface ISysUserService extends IService<SysUser> {
     void deleteUser(Long id);
 
     /**
-     * 分页查询用户
+     * 分页查询用户，携带每个用户的角色列表
      */
-    PageResult<SysUser> pageUsers(SysUserPageReq req);
+    PageResult<SysUserRes> pageUsers(SysUserPageReq req);
 
     /**
      * 根据 ID 更新用户信息
      */
-    void updateUser(Long id, SysUserReq req);
+    void updateUser(Long id, SysUserUpdateReq req);
+
+    /**
+     * 批量删除用户，并清理用户角色关系。
+     */
+    void deleteUsers(List<Long> ids);
 }

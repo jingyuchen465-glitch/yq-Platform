@@ -6,6 +6,8 @@ import com.itcjy.emp.pojo.entity.SysRole;
 import com.itcjy.emp.pojo.req.SysRolePageReq;
 import com.itcjy.emp.pojo.req.SysRoleReq;
 
+import java.util.List;
+
 public interface ISysRoleService extends IService<SysRole> {
 
     /**
@@ -27,4 +29,9 @@ public interface ISysRoleService extends IService<SysRole> {
      * 分页查询角色。
      */
     PageResult<SysRole> pageRoles(SysRolePageReq req);
+
+    /**
+     * 批量删除角色；角色正在被用户使用时不允许删除。
+     */
+    void deleteRoles(List<Long> ids);
 }

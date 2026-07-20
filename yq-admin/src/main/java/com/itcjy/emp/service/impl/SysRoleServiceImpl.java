@@ -22,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> implements ISysRoleService {
@@ -57,7 +59,13 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deleteRole(Long id) {
-        checkRoleExists(id);
+        SysRole role = this.getById(id);
+        if (role == null) {
+            throw BusinessException.ROLE_NOT_EXIST.newInstance("角色不存在");
+        }
+        if ("ACTIVE".equals(role.getStatus())) {
+            throw BusinessException.DATA_ERROR.newInstance("启用状态的角色不能删除，请先禁用");
+        }
         boolean usedByUser = sysUserRoleService.lambdaQuery()
                 .eq(SysUserRole::getRoleId, id)
                 .exists();
@@ -78,7 +86,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                         .like(StrUtil.isNotBlank(req.getRoleCode()), SysRole::getRoleCode, req.getRoleCode())
                         .like(StrUtil.isNotBlank(req.getRoleName()), SysRole::getRoleName, req.getRoleName())
                         .eq(StrUtil.isNotBlank(req.getStatus()), SysRole::getStatus, req.getStatus())
-                        .orderByDesc(SysRole::getId)
+                        .orderByAsc(SysRole::getId)
         );
         return new PageResult<>(page.getTotal(), page.getRecords());
     }
@@ -97,5 +105,41 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         if (exists) {
             throw BusinessException.ROLE_EXIST.newInstance("角色编码已存在");
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteRoles(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw BusinessException.PARAMS_ERROR.newInstance("删除ID列表不能为空");
+        }
+        List<SysRole> roles = this.listByIds(ids);
+        if (roles.size() != ids.size()) {
+            throw BusinessException.ROLE_NOT_EXIST.newInstance("部分角色不存在");
+        }
+        // 检查是否有启用状态的角色
+        List<String> activeRoleNames = roles.stream()
+                .filter(r -> "ACTIVE".equals(r.getStatus()))
+                .map(SysRole::getRoleName)
+                .collect(Collectors.toList());
+        if (!activeRoleNames.isEmpty()) {
+            throw BusinessException.DATA_ERROR.newInstance(
+                    "角色「" + String.join("、", activeRoleNames) + "」处于启用状态，不能删除，请先禁用");
+        }
+        // 检查是否有角色正在被用户使用
+        List<SysUserRole> usedRelations = sysUserRoleService.lambdaQuery()
+                .in(SysUserRole::getRoleId, ids)
+                .list();
+        if (!usedRelations.isEmpty()) {
+            List<Long> usedRoleIds = usedRelations.stream()
+                    .map(SysUserRole::getRoleId).distinct().collect(Collectors.toList());
+            List<String> usedRoleNames = this.listByIds(usedRoleIds).stream()
+                    .map(SysRole::getRoleName).collect(Collectors.toList());
+            throw BusinessException.DATA_ERROR.newInstance(
+                    "角色「" + String.join("、", usedRoleNames) + "」正在被用户使用，不能删除");
+        }
+        sysRolePermissionService.remove(Wrappers.<SysRolePermission>lambdaQuery()
+                .in(SysRolePermission::getRoleId, ids));
+        this.removeByIds(ids);
     }
 }

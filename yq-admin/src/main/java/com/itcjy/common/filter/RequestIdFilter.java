@@ -40,7 +40,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         // 获取或生成唯一请求ID
         String requestId = getOrCreateRequestId(request);
-        // 写入MDC，后续日志自动携带该requestId
+        // 写入MDC，后续日志自动携带该requestId，MDC.put() 把 requestId 绑定到当前线程
         MDC.put(MDC_REQUEST_ID_KEY, requestId);
         // 在响应头中回传requestId，方便调用方进行链路追踪
         response.setHeader(REQUEST_ID_HEADER, requestId);

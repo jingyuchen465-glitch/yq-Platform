@@ -36,3 +36,10 @@ replay_pid*
 .env
 .env.*
 !.env.example
+
+# Frontend (yq-admin-web)
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

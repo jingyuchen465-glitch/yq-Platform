@@ -7,6 +7,8 @@ import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.pojo.entity.SysUser;
 import com.itcjy.emp.pojo.req.SysUserPageReq;
 import com.itcjy.emp.pojo.req.SysUserReq;
+import com.itcjy.emp.pojo.req.SysUserUpdateReq;
+import com.itcjy.emp.pojo.res.SysUserRes;
 import com.itcjy.emp.service.ISysUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -25,6 +27,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -58,7 +62,7 @@ public class SysUserController {
     @HasPermission(code = "sys:user:update", name = "修改用户", description = "根据ID修改系统用户")
     public ApiResponse<Void> updateSysUser(@Parameter(description = "用户ID", required = true)
                                            @PathVariable @NotNull(message = "用户ID不能为空") Long id,
-                                           @Valid @RequestBody SysUserReq req) {
+                                           @Valid @RequestBody SysUserUpdateReq req) {
         sysUserService.updateUser(id, req);
         return ApiResponse.success("修改成功");
     }
@@ -78,7 +82,15 @@ public class SysUserController {
     @Operation(summary = "分页查询员工", description = "支持 username、nickname、real_name 模糊查询")
     @GetMapping("/page")
     @HasPermission(code = "sys:user:page", name = "分页查询用户", description = "分页查询系统用户")
-    public ApiResponse<PageResult<SysUser>> pageSysUser(@Valid @ParameterObject SysUserPageReq req) {
+    public ApiResponse<PageResult<SysUserRes>> pageSysUser(@Valid @ParameterObject SysUserPageReq req) {
         return ApiResponse.success(sysUserService.pageUsers(req));
+    }
+
+    @Operation(summary = "批量删除员工", description = "根据ID列表批量删除员工，并清理用户角色关系")
+    @DeleteMapping("/batchDelete")
+    @HasPermission(code = "sys:user:batchDelete", name = "批量删除用户", description = "批量删除系统用户")
+    public ApiResponse<Void> batchDeleteSysUser(@RequestBody List<@NotNull(message = "用户ID不能为空") Long> ids) {
+        sysUserService.deleteUsers(ids);
+        return ApiResponse.success("批量删除成功");
     }
 }

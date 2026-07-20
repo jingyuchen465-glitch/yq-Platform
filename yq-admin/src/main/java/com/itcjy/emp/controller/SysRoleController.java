@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @Validated
 @RequestMapping("/emp/sysRole")
@@ -78,5 +80,13 @@ public class SysRoleController {
     @HasPermission(code = "sys:role:page", name = "分页查询角色", description = "分页查询系统角色")
     public ApiResponse<PageResult<SysRole>> pageRoles(@Valid @ParameterObject SysRolePageReq req) {
         return ApiResponse.success(sysRoleService.pageRoles(req));
+    }
+
+    @Operation(summary = "批量删除角色", description = "根据ID列表批量删除角色，角色正在被用户使用时不允许删除")
+    @DeleteMapping("/batchDelete")
+    @HasPermission(code = "sys:role:batchDelete", name = "批量删除角色", description = "批量删除系统角色")
+    public ApiResponse<Void> batchDeleteRole(@RequestBody List<@NotNull(message = "角色ID不能为空") Long> ids) {
+        sysRoleService.deleteRoles(ids);
+        return ApiResponse.success("批量删除成功");
     }
 }
