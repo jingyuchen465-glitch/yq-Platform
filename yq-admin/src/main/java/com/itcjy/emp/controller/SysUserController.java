@@ -1,6 +1,6 @@
 package com.itcjy.emp.controller;
 
-import cn.hutool.core.bean.BeanUtil;
+import com.itcjy.common.annotations.HasPermission;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.pojo.ApiResponse;
 import com.itcjy.common.pojo.PageResult;
@@ -36,27 +36,26 @@ public class SysUserController {
     @Resource
     private ISysUserService sysUserService;
 
-    @Operation(summary = "添加员工", description = "新增员工用户信息")
+    @Operation(summary = "添加员工", description = "新增员工用户信息，默认分配讲师角色")
     @PostMapping("/add")
+    @HasPermission(code = "sys:user:add", name = "添加用户", description = "新增系统用户")
     public ApiResponse<Void> addSysUser(@Valid @RequestBody SysUserReq req) {
-        SysUser sysUser = BeanUtil.copyProperties(req, SysUser.class);
-        sysUserService.save(sysUser);
+        sysUserService.addUser(req);
         return ApiResponse.success();
     }
 
-    @Operation(summary = "删除员工", description = "根据ID删除员工")
+    @Operation(summary = "删除员工", description = "根据ID删除员工，并清理用户角色关系")
     @DeleteMapping("/delete/{id}")
+    @HasPermission(code = "sys:user:delete", name = "删除用户", description = "根据ID删除系统用户")
     public ApiResponse<Void> deleteSysUser(@Parameter(description = "用户ID", required = true)
                                            @PathVariable @NotNull(message = "用户ID不能为空") Long id) {
-        boolean removed = sysUserService.removeById(id);
-        if (!removed) {
-            throw BusinessException.USER_NOT_EXIST.newInstance("用户不存在");
-        }
+        sysUserService.deleteUser(id);
         return ApiResponse.success("删除成功");
     }
 
     @Operation(summary = "修改员工", description = "根据ID修改员工信息")
     @PutMapping("/update/{id}")
+    @HasPermission(code = "sys:user:update", name = "修改用户", description = "根据ID修改系统用户")
     public ApiResponse<Void> updateSysUser(@Parameter(description = "用户ID", required = true)
                                            @PathVariable @NotNull(message = "用户ID不能为空") Long id,
                                            @Valid @RequestBody SysUserReq req) {
@@ -66,6 +65,7 @@ public class SysUserController {
 
     @Operation(summary = "查询员工详情", description = "根据ID查询员工详情")
     @GetMapping("/get/{id}")
+    @HasPermission(code = "sys:user:get", name = "查询用户详情", description = "根据ID查询系统用户详情")
     public ApiResponse<SysUser> getSysUser(@Parameter(description = "用户ID", required = true)
                                            @PathVariable @NotNull(message = "用户ID不能为空") Long id) {
         SysUser sysUser = sysUserService.getById(id);
@@ -75,8 +75,9 @@ public class SysUserController {
         return ApiResponse.success(sysUser);
     }
 
-    @Operation(summary = "分页查询员工", description = "支持username、nickname、real_name模糊查询")
+    @Operation(summary = "分页查询员工", description = "支持 username、nickname、real_name 模糊查询")
     @GetMapping("/page")
+    @HasPermission(code = "sys:user:page", name = "分页查询用户", description = "分页查询系统用户")
     public ApiResponse<PageResult<SysUser>> pageSysUser(@Valid @ParameterObject SysUserPageReq req) {
         return ApiResponse.success(sysUserService.pageUsers(req));
     }

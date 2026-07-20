@@ -10,6 +10,15 @@ spring:
 app:
   logging:
     path: ${APP_LOG_PATH:logs}
+  permission-sync:
+    enabled: true
+  role-init:
+    enabled: true
+  admin-permission-init:
+    enabled: true
+    role-code: ${APP_ADMIN_ROLE_CODE:ADMIN}
+  user:
+    default-role-code: ${APP_DEFAULT_USER_ROLE_CODE:LECTURER}
 
 springdoc:
   api-docs:
