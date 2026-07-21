@@ -274,6 +274,8 @@ export default {
       try {
         const res = await listRoleOptions()
         this.roleOptions = res.data || []
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.roleOptionsLoading = false
       }
@@ -285,6 +287,8 @@ export default {
         const res = await pageUsers(this.queryParams)
         this.tableData = res.data.records || []
         this.total = res.data.total || 0
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.loading = false
       }
@@ -335,6 +339,8 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
+        } catch (e) {
+          // 错误已由请求拦截器统一处理
         } finally {
           this.submitLoading = false
         }
@@ -390,6 +396,8 @@ export default {
         ])
         this.allRoles = rolesRes.data.records || []
         this.selectedRoleIds = userRolesRes.data || []
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.roleLoading = false
       }
@@ -400,6 +408,8 @@ export default {
         await assignUserRoles(this.currentUser.id, this.selectedRoleIds)
         this.$message.success('角色分配成功')
         this.roleDialogVisible = false
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.roleSubmitLoading = false
       }

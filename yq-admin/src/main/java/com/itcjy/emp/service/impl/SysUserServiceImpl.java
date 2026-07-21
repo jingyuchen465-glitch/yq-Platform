@@ -248,7 +248,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                 jwtProperties.getExpireMillis(),
                 TimeUnit.MILLISECONDS
         );
-
         //8. 返回登录信息
         LoginRes loginRes = new LoginRes();
         loginRes.setToken(token);

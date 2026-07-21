@@ -26,6 +26,18 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException PRODUCT_NOT_EXIST = new BusinessException(17001, "Product not found");
     public static final BusinessException PREPAY_ORDER_NOT_EXIST = new BusinessException(17002, "Prepay order not found");
     public static final BusinessException REMOTE_ERROR = new BusinessException(17003, "Remote call failed");
+    public static final BusinessException JWT_ERROR = new BusinessException(17004, "Token校验失败");
+    public static final BusinessException JWT_EXPIRE = new BusinessException(17005, "Token已过期");
+    public static final BusinessException USER_NO_TOKEN = new BusinessException(17006, "用户未登录或登录已失效");
+
+    // 签名相关
+    public static final BusinessException REQUEST_HEADER_ERROR = new BusinessException(18001, "请求头签名参数缺失");
+    public static final BusinessException SIGN_NONCE_REPEAT = new BusinessException(18002, "请求不可重复提交");
+    public static final BusinessException SIGN_SECRET_NOT_FOUND = new BusinessException(18003, "签名密钥不存在");
+    public static final BusinessException SIGN_ERROR = new BusinessException(18004, "签名验证失败");
+    public static final BusinessException SIGN_EXPIRE = new BusinessException(18005, "签名已过期");
+    public static final BusinessException PARSE_TIMESTAMP_ERROR = new BusinessException(18006, "时间戳格式错误");
+
 
     public BusinessException(String message) {
         super(message);

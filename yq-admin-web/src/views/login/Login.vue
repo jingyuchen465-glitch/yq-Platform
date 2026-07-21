@@ -1,27 +1,57 @@
 <template>
   <div class="login-page">
-    <!-- 左侧品牌面板 -->
+    <!-- 左侧：安全协议面板 -->
     <div class="login-brand">
-      <div class="brand-inner">
-        <div class="seal-wrap">
-          <span class="seal">YQ</span>
-          <span class="seal-glow"></span>
+      <div class="brand-top">
+        <span class="seal">YQ</span>
+        <div class="brand-name">
+          <h1>YQ 管理台</h1>
+          <p>OPERATION CONSOLE</p>
         </div>
-        <h1 class="brand-title">YQ 管理台</h1>
-        <p class="brand-sub">OPERATION CONSOLE</p>
-        <div class="brand-line"></div>
-        <p class="brand-desc">权限体系 · 用户管理 · 角色控制</p>
       </div>
-      <div class="brand-foot mono">v1.0 · RBAC Engine</div>
+
+      <!-- 签名协议信封（页面加载时实时计算） -->
+      <div class="protocol-card">
+        <div class="protocol-head">
+          <span class="protocol-label">REQUEST ENVELOPE</span>
+          <span class="protocol-dot"></span>
+        </div>
+        <div class="protocol-body">
+          <p class="proto-line proto-method">
+            <span class="k">POST</span>
+            <span class="v dim">/yq-admin/emp/**</span>
+          </p>
+          <p class="proto-line">
+            <span class="k">Authorization</span>
+            <span class="v">Bearer <i class="hl">••••</i></span>
+          </p>
+          <p class="proto-line">
+            <span class="k">X-Timestamp</span>
+            <span class="v">{{ demo.timestamp }}</span>
+          </p>
+          <p class="proto-line">
+            <span class="k">X-Nonce</span>
+            <span class="v">{{ demo.nonce }}</span>
+          </p>
+          <p class="proto-line">
+            <span class="k">X-Sign</span>
+            <span class="v brass">{{ demo.sign }}</span>
+          </p>
+        </div>
+        <div class="protocol-foot">HMAC-SHA256 · 5min TTL · SETNX 防重放</div>
+      </div>
+
+      <p class="brand-desc">权限体系 · 用户管理 · 角色控制</p>
+      <div class="brand-foot">v1.0 · RBAC ENGINE · SIGNED CHANNEL</div>
     </div>
 
-    <!-- 右侧表单区 -->
+    <!-- 右侧：表单区 -->
     <div class="login-form-side">
       <div class="form-card">
         <div class="form-head">
           <p class="form-eyebrow">SECURE ACCESS</p>
           <h2 class="form-title">登录到控制台</h2>
-          <p class="form-hint">使用管理员账号进入权限管理系统</p>
+          <p class="form-hint">登录后所有请求自动携带签名，通道即时生效</p>
         </div>
 
         <el-form
@@ -58,18 +88,19 @@
             :loading="loading"
             @click="handleLogin"
           >
-            {{ loading ? '验证中…' : '登 录' }}
+            {{ loading ? '签署通道建立中…' : '登 录' }}
           </el-button>
         </el-form>
       </div>
 
-      <p class="form-foot mono">YQ Admin · localhost:8080</p>
+      <p class="form-foot">YQ Admin · 签名密钥登录时下发，无需手动配置</p>
     </div>
   </div>
 </template>
 
 <script>
 import { login } from '@/api/auth'
+import { buildRequestSign } from '@/utils/sign'
 
 export default {
   name: 'Login',
@@ -83,10 +114,38 @@ export default {
         username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
         password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
       },
-      loading: false
+      loading: false,
+      // 协议卡片展示值（页面加载时用真实签名算法实时生成）
+      demo: {
+        timestamp: '—',
+        nonce: '—',
+        sign: '—'
+      }
     }
   },
+  mounted() {
+    this.renderProtocolDemo()
+  },
   methods: {
+    /** 用真实签名工具生成一组展示值，让协议卡呈现的是活数据 */
+    async renderProtocolDemo() {
+      try {
+        const { timestamp, nonce, sign } = await buildRequestSign(
+          'POST',
+          '/yq-admin/emp/sysUser/page',
+          'page=1&size=10',
+          'demo-secret-key'
+        )
+        this.demo = { timestamp, nonce, sign: sign.slice(0, 24) + '…' }
+      } catch (e) {
+        // 非安全上下文（http）降级为静态占位
+        this.demo = {
+          timestamp: String(Date.now()),
+          nonce: 'a3f8c1e90b7d4265',
+          sign: 'kQ9x2Wm7vJ4pR8sT1uN6…'
+        }
+      }
+    },
     handleLogin() {
       this.$refs.loginForm.validate(async valid => {
         if (!valid) return
@@ -94,11 +153,11 @@ export default {
         try {
           const res = await login(this.form)
           const { token, signSecret, userDetailRes } = res.data
-          // 持久化登录态
+          // 持久化登录态：token + 签名密钥
           localStorage.setItem('yq_token', token)
           localStorage.setItem('yq_sign_secret', signSecret)
           localStorage.setItem('yq_user', JSON.stringify(userDetailRes))
-          this.$message.success('登录成功')
+          this.$message.success('登录成功，签名通道已建立')
           this.$router.push('/')
         } catch (e) {
           // 错误已由拦截器统一提示
@@ -117,112 +176,184 @@ export default {
   display: flex;
 }
 
-/* ---------- 左侧品牌面板 ---------- */
+/* ========== 左侧：协议面板 ========== */
 .login-brand {
-  width: 380px;
+  width: 400px;
   flex: none;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 0;
+  padding: 48px 36px;
   background:
-    radial-gradient(ellipse 60% 50% at 50% 42%, rgba(30, 75, 59, .55) 0%, transparent 70%),
-    linear-gradient(180deg, rgba(255,255,255,.03) 0%, rgba(255,255,255,0) 260px),
+    radial-gradient(ellipse 70% 46% at 50% 38%, rgba(30, 75, 59, .5) 0%, transparent 72%),
     var(--pine);
   position: relative;
   overflow: hidden;
 }
-/* 纹理装饰线 */
+/* 网格纹理：暗示工程蓝图 */
 .login-brand::before {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 79px,
-      rgba(255,255,255,.025) 79px,
-      rgba(255,255,255,.025) 80px
-    );
+    repeating-linear-gradient(0deg, transparent, transparent 63px, rgba(255,255,255,.022) 63px, rgba(255,255,255,.022) 64px),
+    repeating-linear-gradient(90deg, transparent, transparent 63px, rgba(255,255,255,.022) 63px, rgba(255,255,255,.022) 64px);
   pointer-events: none;
 }
 
-.brand-inner {
+/* 品牌行 */
+.brand-top {
   position: relative;
-  text-align: center;
   z-index: 1;
-}
-
-.seal-wrap {
-  position: relative;
-  display: inline-flex;
-  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  align-self: flex-start;
+  margin-bottom: 36px;
 }
 .seal {
-  width: 72px;
-  height: 72px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--brass);
   color: var(--pine);
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 17px;
   font-weight: 800;
-  letter-spacing: .03em;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px -8px rgba(185, 138, 47, .6);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px -6px rgba(185, 138, 47, .55);
+  flex: none;
 }
-.seal-glow {
-  position: absolute;
-  inset: -18px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(185, 138, 47, .18) 0%, transparent 70%);
-  animation: glow-pulse 3.2s ease-in-out infinite;
-}
-@keyframes glow-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .5; transform: scale(1.12); }
-}
-
-.brand-title {
+.brand-name h1 {
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 19px;
   font-weight: 800;
   color: #F2F6F1;
-  letter-spacing: .04em;
-  margin-bottom: 8px;
+  letter-spacing: .03em;
+  line-height: 1.2;
 }
-.brand-sub {
+.brand-name p {
   font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: .32em;
+  font-size: 9px;
+  letter-spacing: .3em;
   color: #6E8578;
-  margin-bottom: 24px;
+  margin-top: 3px;
 }
-.brand-line {
-  width: 36px;
-  height: 2px;
-  background: var(--brass);
-  margin: 0 auto 20px;
-  border-radius: 1px;
+
+/* 协议信封卡片 —— 页面签名元素 */
+.protocol-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  overflow: hidden;
 }
+.protocol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.protocol-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .26em;
+  color: #7FA392;
+}
+.protocol-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--jade);
+  box-shadow: 0 0 8px rgba(23, 126, 99, .8);
+  animation: dot-breathe 2.4s ease-in-out infinite;
+}
+@keyframes dot-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+.protocol-body {
+  padding: 16px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.proto-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  animation: line-in .45s ease both;
+}
+.proto-line:nth-child(1) { animation-delay: .10s; }
+.proto-line:nth-child(2) { animation-delay: .22s; }
+.proto-line:nth-child(3) { animation-delay: .34s; }
+.proto-line:nth-child(4) { animation-delay: .46s; }
+.proto-line:nth-child(5) { animation-delay: .58s; }
+@keyframes line-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.proto-line .k {
+  flex: none;
+  width: 108px;
+  color: #7FA392;
+  font-weight: 500;
+}
+.proto-line .v {
+  color: #D4E2DA;
+  word-break: break-all;
+}
+.proto-line .v.dim { color: #5C7266; }
+.proto-line .v .hl {
+  font-style: normal;
+  color: var(--brass);
+}
+.proto-line .v.brass { color: #D9A94E; }
+.proto-method .k {
+  color: #F2F6F1;
+  font-weight: 700;
+}
+
+.protocol-foot {
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255, 255, 255, .07);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: #5C7266;
+}
+
 .brand-desc {
+  position: relative;
+  z-index: 1;
+  margin-top: 32px;
   font-size: 13px;
   color: #8FA79A;
-  letter-spacing: .12em;
+  letter-spacing: .14em;
 }
-
 .brand-foot {
   position: absolute;
-  bottom: 24px;
-  font-size: 10.5px;
-  color: #5C7266;
-  letter-spacing: .06em;
+  bottom: 22px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: .12em;
+  color: #4E6357;
 }
 
-/* ---------- 右侧表单区 ---------- */
+/* ========== 右侧：表单区 ========== */
 .login-form-side {
   flex: 1;
   display: flex;
@@ -242,6 +373,11 @@ export default {
   border-radius: 12px;
   box-shadow: var(--shadow-card);
   padding: 36px 32px 32px;
+  animation: card-in .4s ease both;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .form-head {
@@ -302,28 +438,21 @@ export default {
 .form-foot {
   position: absolute;
   bottom: 24px;
+  font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--ink-3);
   letter-spacing: .04em;
 }
 
-/* ---------- 响应式 ---------- */
+/* ========== 响应式 ========== */
 @media (max-width: 860px) {
   .login-brand { display: none; }
   .login-form-side { padding: 24px; }
 }
 
-/* ---------- 入场动效 ---------- */
-.form-card {
-  animation: card-in .4s ease both;
-}
-@keyframes card-in {
-  from { opacity: 0; transform: translateY(14px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .form-card { animation: none; }
-  .seal-glow { animation: none; }
+  .proto-line { animation: none; }
+  .protocol-dot { animation: none; }
 }
 </style>

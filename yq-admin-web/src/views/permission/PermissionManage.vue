@@ -135,6 +135,8 @@ export default {
         const res = await pagePermissions(this.queryParams)
         this.tableData = res.data.records || []
         this.total = res.data.total || 0
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.loading = false
       }
@@ -148,9 +150,13 @@ export default {
       this.fetchData()
     },
     async handleDetail(row) {
-      const res = await getPermission(row.id)
-      this.detailData = res.data
-      this.detailVisible = true
+      try {
+        const res = await getPermission(row.id)
+        this.detailData = res.data
+        this.detailVisible = true
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
+      }
     },
     async handleStatusChange(row, val) {
       const newStatus = val ? 'ACTIVE' : 'INACTIVE'

@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { Message } from 'element-ui'
 import router from '@/router'
+import { buildRequestSign, buildQueryString } from '@/utils/sign'
 
 // 创建 axios 实例，baseURL 走 devServer 代理
 const service = axios.create({
@@ -8,12 +9,32 @@ const service = axios.create({
   timeout: 15000
 })
 
-// 请求拦截器：自动携带 token
+// 请求拦截器：自动携带 Authorization + 签名三要素（X-Timestamp / X-Nonce / X-Sign）
 service.interceptors.request.use(
-  config => {
+  async config => {
     const token = localStorage.getItem('yq_token')
-    if (token) {
+    const signSecret = localStorage.getItem('yq_sign_secret')
+
+    if (token && signSecret) {
+      // 先自行序列化查询参数，保证签名原文与实际发出的 query 完全一致
+      const query = buildQueryString(config.params)
+      if (config.params) {
+        config.paramsSerializer = () => query
+      }
+
+      // 后端 request.getRequestURI() 包含 context-path，即 baseURL + url
+      const uri = (config.baseURL || '') + config.url
+      const { timestamp, nonce, sign } = await buildRequestSign(
+        (config.method || 'get').toUpperCase(),
+        uri,
+        query,
+        signSecret
+      )
+
       config.headers['Authorization'] = 'Bearer ' + token
+      config.headers['X-Timestamp'] = timestamp
+      config.headers['X-Nonce'] = nonce
+      config.headers['X-Sign'] = sign
     }
     return config
   },
@@ -22,16 +43,28 @@ service.interceptors.request.use(
   }
 )
 
+// 认证失效业务码（后端 GlobalExceptionHandler 统一返回 HTTP 200，需按业务码判断）
+const AUTH_FAIL_CODES = [17004, 17005, 17006]
+
+function clearAuthAndRedirect() {
+  localStorage.removeItem('yq_token')
+  localStorage.removeItem('yq_sign_secret')
+  localStorage.removeItem('yq_user')
+  router.push('/login')
+}
+
 // 响应拦截器：统一处理后端 ApiResponse 结构 { code, message, data }
 service.interceptors.response.use(
   response => {
     const res = response.data
     if (res.code !== 200) {
-      Message({
-        message: res.message || '请求失败',
-        type: 'error',
-        duration: 3000
-      })
+      // 认证失效：清除登录态并跳转登录页
+      if (AUTH_FAIL_CODES.includes(res.code)) {
+        clearAuthAndRedirect()
+        Message({ message: '登录已失效，请重新登录', type: 'error', duration: 3000 })
+      } else {
+        Message({ message: res.message || '请求失败', type: 'error', duration: 3000 })
+      }
       return Promise.reject(new Error(res.message || '请求失败'))
     }
     return res
@@ -41,11 +74,7 @@ service.interceptors.response.use(
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
-        // token 过期或无效，清除登录态并跳转登录页
-        localStorage.removeItem('yq_token')
-        localStorage.removeItem('yq_sign_secret')
-        localStorage.removeItem('yq_user')
-        router.push('/login')
+        clearAuthAndRedirect()
         msg = '登录已过期，请重新登录'
       } else if (data && data.message) {
         msg = data.message
@@ -55,11 +84,7 @@ service.interceptors.response.use(
         msg = '服务器内部错误'
       }
     }
-    Message({
-      message: msg,
-      type: 'error',
-      duration: 3000
-    })
+    Message({ message: msg, type: 'error', duration: 3000 })
     return Promise.reject(error)
   }
 )

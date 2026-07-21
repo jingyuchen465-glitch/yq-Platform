@@ -213,6 +213,8 @@ export default {
         const res = await pageRoles(this.queryParams)
         this.tableData = res.data.records || []
         this.total = res.data.total || 0
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.loading = false
       }
@@ -255,6 +257,8 @@ export default {
           }
           this.dialogVisible = false
           this.fetchData()
+        } catch (e) {
+          // 错误已由请求拦截器统一处理
         } finally {
           this.submitLoading = false
         }
@@ -314,6 +318,8 @@ export default {
             }
           })
         })
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.permLoading = false
       }
@@ -332,6 +338,8 @@ export default {
         await assignRolePermissions(this.currentRole.id, this.selectedPermIds)
         this.$message.success('授权成功')
         this.permDialogVisible = false
+      } catch (e) {
+        // 错误已由请求拦截器统一处理
       } finally {
         this.permSubmitLoading = false
       }
