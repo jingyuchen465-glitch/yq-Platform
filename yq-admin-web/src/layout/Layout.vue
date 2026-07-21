@@ -36,7 +36,16 @@
         <span class="top-clock mono">{{ clockText }}</span>
         <div class="top-right">
           <span class="env-tag">DEV</span>
-          <span class="admin-chip"><i class="presence"></i>管理员</span>
+          <span class="admin-chip"><i class="presence"></i>{{ currentUserName }}</span>
+          <el-tooltip content="退出登录" placement="bottom">
+            <el-button
+              class="logout-btn"
+              icon="el-icon-switch-button"
+              :loading="logoutLoading"
+              circle
+              @click="handleLogout"
+            />
+          </el-tooltip>
         </div>
       </header>
 
@@ -51,6 +60,8 @@
 </template>
 
 <script>
+import { logout } from '@/api/auth'
+
 export default {
   name: 'Layout',
   data() {
@@ -61,7 +72,8 @@ export default {
         { path: '/permission', title: '权限管理', icon: 'el-icon-lock' }
       ],
       now: new Date(),
-      timer: null
+      timer: null,
+      logoutLoading: false
     }
   },
   computed: {
@@ -73,6 +85,48 @@ export default {
       const week = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()]
       const pad = n => String(n).padStart(2, '0')
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${week} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+    },
+    currentUserName() {
+      const userText = localStorage.getItem('yq_user')
+      if (!userText) return '管理员'
+      try {
+        const user = JSON.parse(userText)
+        return user.nickname || user.realName || user.username || '管理员'
+      } catch (e) {
+        return '管理员'
+      }
+    }
+  },
+  methods: {
+    clearLoginStorage() {
+      localStorage.removeItem('yq_token')
+      localStorage.removeItem('yq_sign_secret')
+      localStorage.removeItem('yq_user')
+    },
+    async handleLogout() {
+      try {
+        await this.$confirm('确定退出当前账号吗？', '退出登录', {
+          confirmButtonText: '退出',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+      } catch (e) {
+        return
+      }
+
+      this.logoutLoading = true
+      try {
+        await logout()
+        this.$message.success('已退出登录')
+      } catch (e) {
+        // 后端登录态可能已经失效，本地仍然需要清理，避免坏 token 留在浏览器里。
+      } finally {
+        this.logoutLoading = false
+        this.clearLoginStorage()
+        if (this.$route.path !== '/login') {
+          this.$router.replace('/login')
+        }
+      }
     }
   },
   mounted() {
@@ -235,6 +289,20 @@ export default {
   border-radius: 50%;
   background: var(--jade);
   box-shadow: 0 0 0 3px var(--jade-soft);
+}
+.logout-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: var(--line);
+  color: var(--ink-3);
+  background: #FFFFFF;
+}
+.logout-btn:hover,
+.logout-btn:focus {
+  border-color: var(--brass);
+  color: var(--brass-ink);
+  background: #FFFCF5;
 }
 
 .main {

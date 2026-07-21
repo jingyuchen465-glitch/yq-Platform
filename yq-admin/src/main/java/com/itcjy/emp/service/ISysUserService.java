@@ -45,4 +45,9 @@ public interface ISysUserService extends IService<SysUser> {
     void deleteUsers(List<Long> ids);
 
     LoginRes empLogin(LoginReq req);
+
+    /**
+     * 退出登录，清理当前用户在 Redis 中的登录态。
+     */
+    void logout(String authorization);
 }

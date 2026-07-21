@@ -1,6 +1,7 @@
 package com.itcjy.emp.controller;
 
 import com.itcjy.common.annotations.HasPermission;
+import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.emp.pojo.req.LoginReq;
 import com.itcjy.emp.pojo.res.LoginRes;
 import com.itcjy.common.exception.BusinessException;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -46,6 +48,13 @@ public class SysUserController {
     @PostMapping("/login")
     public ApiResponse<LoginRes> empLogin(@Valid @RequestBody LoginReq req) {
         return ApiResponse.success(sysUserService.empLogin(req));
+    }
+
+    @Operation(summary = "员工退出登录", description = "清理当前登录用户在Redis中的登录态")
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout(@RequestHeader(TokenConstants.AUTHORIZATION) String authorization) {
+        sysUserService.logout(authorization);
+        return ApiResponse.success("退出成功");
     }
 
     @Operation(summary = "添加员工", description = "新增员工用户信息，默认分配讲师角色")

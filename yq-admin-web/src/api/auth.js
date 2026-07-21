@@ -13,3 +13,11 @@ export function login(data) {
     data
   })
 }
+
+// 退出登录
+export function logout() {
+  return request({
+    url: '/emp/sysUser/logout',
+    method: 'post'
+  })
+}

@@ -24,6 +24,7 @@ import com.itcjy.emp.pojo.res.LoginRes;
 import com.itcjy.emp.pojo.res.SysUserRes;
 import com.itcjy.emp.pojo.res.UserDetailRes;
 import com.itcjy.emp.service.*;
+import io.jsonwebtoken.JwtException;
 import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -255,6 +256,26 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         loginRes.setUserDetailRes(userDetailRes);
         return loginRes;
 
+    }
+
+    @Override
+    public void logout(String authorization) {
+        String token = jwtUtil.resolveToken(authorization);
+        if (StrUtil.isBlank(token)) {
+            throw BusinessException.USER_NO_TOKEN;
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.getUserId(token);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw BusinessException.JWT_ERROR;
+        }
+        if (userId == null) {
+            throw BusinessException.JWT_ERROR;
+        }
+
+        redisTemplate.delete(TokenConstants.USER_JWT_KEY_PREFIX + userId);
     }
 
     private UserDetailRes buildUserDetail(SysUser user) {
