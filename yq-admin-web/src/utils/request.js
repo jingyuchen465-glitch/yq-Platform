@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { Message } from 'element-ui'
+import router from '@/router'
 
 // 创建 axios 实例，baseURL 走 devServer 代理
 const service = axios.create({
@@ -7,10 +8,13 @@ const service = axios.create({
   timeout: 15000
 })
 
-// 请求拦截器
+// 请求拦截器：自动携带 token
 service.interceptors.request.use(
   config => {
-    // 如需 token 可在此处添加: config.headers['Authorization'] = getToken()
+    const token = localStorage.getItem('yq_token')
+    if (token) {
+      config.headers['Authorization'] = 'Bearer ' + token
+    }
     return config
   },
   error => {
@@ -36,7 +40,14 @@ service.interceptors.response.use(
     let msg = '网络异常，请稍后重试'
     if (error.response) {
       const { status, data } = error.response
-      if (data && data.message) {
+      if (status === 401) {
+        // token 过期或无效，清除登录态并跳转登录页
+        localStorage.removeItem('yq_token')
+        localStorage.removeItem('yq_sign_secret')
+        localStorage.removeItem('yq_user')
+        router.push('/login')
+        msg = '登录已过期，请重新登录'
+      } else if (data && data.message) {
         msg = data.message
       } else if (status === 404) {
         msg = '请求的资源不存在'

@@ -15,6 +15,13 @@ export function pageRoles(params) {
 }
 
 // 查询角色详情
+export function listRoleOptions() {
+  return request({
+    url: '/emp/sysRole/list',
+    method: 'get'
+  })
+}
+
 export function getRole(id) {
   return request({
     url: `/emp/sysRole/get/${id}`,

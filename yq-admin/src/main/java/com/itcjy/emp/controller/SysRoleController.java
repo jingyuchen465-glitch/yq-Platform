@@ -7,6 +7,7 @@ import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.pojo.entity.SysRole;
 import com.itcjy.emp.pojo.req.SysRolePageReq;
 import com.itcjy.emp.pojo.req.SysRoleReq;
+import com.itcjy.emp.pojo.res.SysRoleOptionRes;
 import com.itcjy.emp.service.ISysRoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -80,6 +81,13 @@ public class SysRoleController {
     @HasPermission(code = "sys:role:page", name = "分页查询角色", description = "分页查询系统角色")
     public ApiResponse<PageResult<SysRole>> pageRoles(@Valid @ParameterObject SysRolePageReq req) {
         return ApiResponse.success(sysRoleService.pageRoles(req));
+    }
+
+    @Operation(summary = "查询角色下拉选项", description = "查询数据库现存角色，用于用户管理页面角色筛选")
+    @GetMapping("/list")
+    @HasPermission(code = "sys:role:list", name = "查询角色列表", description = "查询角色下拉选项")
+    public ApiResponse<List<SysRoleOptionRes>> listRoleOptions() {
+        return ApiResponse.success(sysRoleService.listRoleOptions());
     }
 
     @Operation(summary = "批量删除角色", description = "根据ID列表批量删除角色，角色正在被用户使用时不允许删除")

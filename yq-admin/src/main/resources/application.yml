@@ -19,6 +19,12 @@ app:
     role-code: ${APP_ADMIN_ROLE_CODE:ADMIN}
   user:
     default-role-code: ${APP_DEFAULT_USER_ROLE_CODE:LECTURER}
+  jwt:
+    secret: ${JWT_SECRET:yanque-dev-jwt-secret-please-change-32bytes}
+    expire-millis: ${JWT_EXPIRE_MILLIS:7200000}
+    issuer: ${JWT_ISSUER:yq-admin}
+    header-name: Authorization
+    token-prefix: 'Bearer '
 
 springdoc:
   api-docs:

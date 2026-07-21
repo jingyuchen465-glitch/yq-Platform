@@ -14,6 +14,7 @@ import com.itcjy.emp.pojo.entity.SysRolePermission;
 import com.itcjy.emp.pojo.entity.SysUserRole;
 import com.itcjy.emp.pojo.req.SysRolePageReq;
 import com.itcjy.emp.pojo.req.SysRoleReq;
+import com.itcjy.emp.pojo.res.SysRoleOptionRes;
 import com.itcjy.emp.service.ISysRolePermissionService;
 import com.itcjy.emp.service.ISysRoleService;
 import com.itcjy.emp.service.ISysUserRoleService;
@@ -89,6 +90,16 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                         .orderByAsc(SysRole::getId)
         );
         return new PageResult<>(page.getTotal(), page.getRecords());
+    }
+
+    @Override
+    public List<SysRoleOptionRes> listRoleOptions() {
+        return this.lambdaQuery()
+                .orderByAsc(SysRole::getId)
+                .list()
+                .stream()
+                .map(SysRoleOptionRes::from)
+                .collect(Collectors.toList());
     }
 
     private void checkRoleExists(Long id) {

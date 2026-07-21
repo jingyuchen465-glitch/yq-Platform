@@ -6,6 +6,12 @@ Vue.use(VueRouter)
 
 const routes = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/login/Login.vue'),
+    meta: { title: '登录', public: true }
+  },
+  {
     path: '/',
     component: Layout,
     redirect: '/user',
@@ -34,6 +40,18 @@ const routes = [
 
 const router = new VueRouter({
   routes
+})
+
+// 导航守卫：未登录跳转登录页
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('yq_token')
+  if (!to.meta.public && !token) {
+    next('/login')
+  } else if (to.path === '/login' && token) {
+    next('/')
+  } else {
+    next()
+  }
 })
 
 export default router

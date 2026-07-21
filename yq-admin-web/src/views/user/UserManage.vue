@@ -24,6 +24,24 @@
         <el-form-item label="真实姓名">
           <el-input v-model="queryParams.realName" placeholder="请输入真实姓名" clearable @keyup.enter.native="handleSearch" />
         </el-form-item>
+        <el-form-item label="角色">
+          <el-select
+            v-model="queryParams.roleId"
+            placeholder="请选择角色"
+            clearable
+            filterable
+            :loading="roleOptionsLoading"
+            style="width: 180px;"
+            @change="handleSearch"
+          >
+            <el-option
+              v-for="role in roleOptions"
+              :key="role.id"
+              :label="`${role.roleName}（${role.roleCode}）`"
+              :value="role.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-search" @click="handleSearch">查询</el-button>
           <el-button icon="el-icon-refresh" @click="handleReset">重置</el-button>
@@ -165,7 +183,7 @@
 
 <script>
 import { pageUsers, addUser, updateUser, deleteUser, batchDeleteUsers, getUserRoleIds, assignUserRoles } from '@/api/user'
-import { pageRoles } from '@/api/role'
+import { pageRoles, listRoleOptions } from '@/api/role'
 
 export default {
   name: 'UserManage',
@@ -181,8 +199,11 @@ export default {
         size: 10,
         username: '',
         nickname: '',
-        realName: ''
+        realName: '',
+        roleId: ''
       },
+      roleOptionsLoading: false,
+      roleOptions: [],
       // 弹窗相关
       dialogVisible: false,
       isEdit: false,
@@ -244,9 +265,19 @@ export default {
     }
   },
   created() {
+    this.fetchRoleOptions()
     this.fetchData()
   },
   methods: {
+    async fetchRoleOptions() {
+      this.roleOptionsLoading = true
+      try {
+        const res = await listRoleOptions()
+        this.roleOptions = res.data || []
+      } finally {
+        this.roleOptionsLoading = false
+      }
+    },
     // 查询列表
     async fetchData() {
       this.loading = true
@@ -263,7 +294,7 @@ export default {
       this.fetchData()
     },
     handleReset() {
-      this.queryParams = { current: 1, size: 10, username: '', nickname: '', realName: '' }
+      this.queryParams = { current: 1, size: 10, username: '', nickname: '', realName: '', roleId: '' }
       this.fetchData()
     },
     // 新增

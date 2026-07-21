@@ -1,6 +1,8 @@
 package com.itcjy.emp.controller;
 
 import com.itcjy.common.annotations.HasPermission;
+import com.itcjy.emp.pojo.req.LoginReq;
+import com.itcjy.emp.pojo.res.LoginRes;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.pojo.ApiResponse;
 import com.itcjy.common.pojo.PageResult;
@@ -39,6 +41,12 @@ public class SysUserController {
 
     @Resource
     private ISysUserService sysUserService;
+
+    @Operation(summary = "员工登录", description = "根据用户名和密码登录，返回token")
+    @PostMapping("/login")
+    public ApiResponse<LoginRes> empLogin(@Valid @RequestBody LoginReq req) {
+        return ApiResponse.success(sysUserService.empLogin(req));
+    }
 
     @Operation(summary = "添加员工", description = "新增员工用户信息，默认分配讲师角色")
     @PostMapping("/add")

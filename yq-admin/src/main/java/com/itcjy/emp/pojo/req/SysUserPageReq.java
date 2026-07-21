@@ -2,6 +2,7 @@ package com.itcjy.emp.pojo.req;
 
 import com.itcjy.common.pojo.BasePageReq;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,6 +23,10 @@ public class SysUserPageReq extends BasePageReq {
     @Schema(description = "真实姓名模糊查询", example = "三")
     @Size(max = 64, message = "真实姓名长度不能超过64个字符")
     private String realName;
+
+    @Schema(description = "角色ID精确查询", example = "1")
+    @Min(value = 1, message = "角色ID必须大于0")
+    private Long roleId;
 
     public void setReal_name(String realName) {
         if (realName != null && !realName.isBlank() && (this.realName == null || this.realName.isBlank())) {

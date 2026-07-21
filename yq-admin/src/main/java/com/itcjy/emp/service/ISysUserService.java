@@ -3,9 +3,11 @@ package com.itcjy.emp.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.pojo.entity.SysUser;
+import com.itcjy.emp.pojo.req.LoginReq;
 import com.itcjy.emp.pojo.req.SysUserPageReq;
 import com.itcjy.emp.pojo.req.SysUserReq;
 import com.itcjy.emp.pojo.req.SysUserUpdateReq;
+import com.itcjy.emp.pojo.res.LoginRes;
 import com.itcjy.emp.pojo.res.SysUserRes;
 
 import java.util.List;
@@ -41,4 +43,6 @@ public interface ISysUserService extends IService<SysUser> {
      * 批量删除用户，并清理用户角色关系。
      */
     void deleteUsers(List<Long> ids);
+
+    LoginRes empLogin(LoginReq req);
 }
