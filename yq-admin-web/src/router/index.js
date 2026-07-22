@@ -47,6 +47,12 @@ const routes = [
         meta: { title: '课程管理', icon: 'el-icon-reading' }
       },
       {
+        path: 'class',
+        name: 'ClassManage',
+        component: () => import('@/views/class/ClassManage.vue'),
+        meta: { title: '班级管理', icon: 'el-icon-school' }
+      },
+      {
         path: 'course-detail/:courseId',
         name: 'CourseDetailManage',
         component: () => import('@/views/course/CourseDetailManage.vue'),

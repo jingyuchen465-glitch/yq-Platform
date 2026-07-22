@@ -27,6 +27,7 @@ public class SystemRoleInitRunner implements ApplicationRunner {
     private static final List<SystemRole> SYSTEM_ROLES = List.of(
             new SystemRole("ADMIN", "超级管理员", "拥有系统全部权限"),
             new SystemRole("LECTURER", "讲师", "负责课程教学与学员管理"),
+            new SystemRole("COORDINATOR", "班主任", "负责班级日常管理与学员协调"),
             new SystemRole("STUDENT", "学生", "系统学员角色"),
             new SystemRole("OPERATOR", "运营人员", "负责后台运营管理")
     );

@@ -87,7 +87,8 @@ export default {
       ],
       eduMenuItems: [
         { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' },
-        { path: '/course', title: '课程管理', icon: 'el-icon-reading' }
+        { path: '/course', title: '课程管理', icon: 'el-icon-reading' },
+        { path: '/class', title: '班级管理', icon: 'el-icon-school' }
       ],
       now: new Date(),
       timer: null,
