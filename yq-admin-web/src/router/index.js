@@ -33,6 +33,12 @@ const routes = [
         name: 'PermissionManage',
         component: () => import('@/views/permission/PermissionManage.vue'),
         meta: { title: '权限管理', icon: 'el-icon-lock' }
+      },
+      {
+        path: 'campus',
+        name: 'CampusManage',
+        component: () => import('@/views/campus/CampusManage.vue'),
+        meta: { title: '校区管理', icon: 'el-icon-office-building' }
       }
     ]
   },

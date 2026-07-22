@@ -13,7 +13,21 @@
       <p class="nav-cap">权限体系</p>
       <nav class="nav">
         <router-link
-          v-for="item in menuItems"
+          v-for="item in permMenuItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: activeMenu === item.path }"
+        >
+          <i :class="item.icon"></i>
+          <span>{{ item.title }}</span>
+        </router-link>
+      </nav>
+
+      <p class="nav-cap">教务管理</p>
+      <nav class="nav">
+        <router-link
+          v-for="item in eduMenuItems"
           :key="item.path"
           :to="item.path"
           class="nav-item"
@@ -66,10 +80,13 @@ export default {
   name: 'Layout',
   data() {
     return {
-      menuItems: [
+      permMenuItems: [
         { path: '/user', title: '用户管理', icon: 'el-icon-user' },
         { path: '/role', title: '角色管理', icon: 'el-icon-s-check' },
         { path: '/permission', title: '权限管理', icon: 'el-icon-lock' }
+      ],
+      eduMenuItems: [
+        { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' }
       ],
       now: new Date(),
       timer: null,

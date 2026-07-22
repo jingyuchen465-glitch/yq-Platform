@@ -22,6 +22,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        // 静态资源等处理器不是 HandlerMethod，不参与接口权限校验
         if (!(handler instanceof HandlerMethod handlerMethod)) {
             return true;
         }
