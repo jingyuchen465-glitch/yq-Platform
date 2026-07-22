@@ -86,7 +86,8 @@ export default {
         { path: '/permission', title: '权限管理', icon: 'el-icon-lock' }
       ],
       eduMenuItems: [
-        { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' }
+        { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' },
+        { path: '/course', title: '课程管理', icon: 'el-icon-reading' }
       ],
       now: new Date(),
       timer: null,

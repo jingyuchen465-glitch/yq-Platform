@@ -39,6 +39,18 @@ const routes = [
         name: 'CampusManage',
         component: () => import('@/views/campus/CampusManage.vue'),
         meta: { title: '校区管理', icon: 'el-icon-office-building' }
+      },
+      {
+        path: 'course',
+        name: 'CourseManage',
+        component: () => import('@/views/course/CourseManage.vue'),
+        meta: { title: '课程管理', icon: 'el-icon-reading' }
+      },
+      {
+        path: 'course-detail/:courseId',
+        name: 'CourseDetailManage',
+        component: () => import('@/views/course/CourseDetailManage.vue'),
+        meta: { title: '课程详情', icon: 'el-icon-tickets', hidden: true }
       }
     ]
   },
