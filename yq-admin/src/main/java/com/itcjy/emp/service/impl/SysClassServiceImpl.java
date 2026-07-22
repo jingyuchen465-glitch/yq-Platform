@@ -22,6 +22,7 @@ import com.itcjy.emp.pojo.res.SysClassFormOptionsRes;
 import com.itcjy.emp.pojo.res.SysClassOptionRes;
 import com.itcjy.emp.pojo.res.SysClassRes;
 import com.itcjy.emp.service.ISysCampusService;
+import com.itcjy.emp.service.ISysClassScheduleService;
 import com.itcjy.emp.service.ISysClassService;
 import com.itcjy.emp.service.ISysCourseService;
 import com.itcjy.emp.service.ISysRoleService;
@@ -50,6 +51,7 @@ public class SysClassServiceImpl extends ServiceImpl<SysClassMapper, SysClass> i
     private final ISysUserService sysUserService;
     private final ISysRoleService sysRoleService;
     private final ISysUserRoleService sysUserRoleService;
+    private final ISysClassScheduleService sysClassScheduleService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -75,6 +77,7 @@ public class SysClassServiceImpl extends ServiceImpl<SysClassMapper, SysClass> i
     @Transactional(rollbackFor = Exception.class)
     public void deleteClass(Long id) {
         checkClassExists(id);
+        sysClassScheduleService.deleteByClassId(id);
         this.removeById(id);
     }
 

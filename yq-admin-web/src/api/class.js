@@ -49,3 +49,18 @@ export function deleteClass(id) {
     method: 'delete'
   })
 }
+
+export function generateClassSchedule(data) {
+  return request({
+    url: '/emp/sysClassSchedule/generate',
+    method: 'post',
+    data
+  })
+}
+
+export function listClassSchedule(classId) {
+  return request({
+    url: `/emp/sysClassSchedule/list/${classId}`,
+    method: 'get'
+  })
+}

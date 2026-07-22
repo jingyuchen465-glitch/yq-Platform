@@ -23,6 +23,7 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException COURSE_NOT_EXIST = new BusinessException(15001, "Course not found");
     public static final BusinessException COURSE_DETAIL_NOT_EXIST = new BusinessException(15002, "Course detail not found");
     public static final BusinessException CLAZZ_NOT_EXIST = new BusinessException(16001, "Class not found");
+    public static final BusinessException CLASS_SCHEDULE_ERROR = new BusinessException(16002, "Class schedule error");
     public static final BusinessException PRODUCT_NOT_EXIST = new BusinessException(17001, "Product not found");
     public static final BusinessException PREPAY_ORDER_NOT_EXIST = new BusinessException(17002, "Prepay order not found");
     public static final BusinessException REMOTE_ERROR = new BusinessException(17003, "Remote call failed");
