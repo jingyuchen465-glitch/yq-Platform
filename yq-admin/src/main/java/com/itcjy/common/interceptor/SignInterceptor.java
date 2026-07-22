@@ -6,7 +6,7 @@ import cn.hutool.crypto.digest.HMac;
 import cn.hutool.crypto.digest.HmacAlgorithm;
 import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.exception.BusinessException;
-import com.itcjy.emp.pojo.res.LoginInfo;
+import com.itcjy.emp.pojo.res.system.LoginInfo;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

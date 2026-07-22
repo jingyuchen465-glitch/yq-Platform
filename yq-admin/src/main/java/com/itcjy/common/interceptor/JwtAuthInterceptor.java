@@ -3,7 +3,7 @@ package com.itcjy.common.interceptor;
 import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.utils.JwtUtil;
-import com.itcjy.emp.pojo.res.LoginInfo;
+import com.itcjy.emp.pojo.res.system.LoginInfo;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
