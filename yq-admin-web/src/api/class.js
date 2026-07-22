@@ -64,3 +64,55 @@ export function listClassSchedule(classId) {
     method: 'get'
   })
 }
+
+export function getClassSchedule(scheduleId) {
+  return request({
+    url: `/emp/sysClassSchedule/get/${scheduleId}`,
+    method: 'get'
+  })
+}
+
+export function updateClassSchedule(scheduleId, data) {
+  return request({
+    url: `/emp/sysClassSchedule/update/${scheduleId}`,
+    method: 'put',
+    data
+  })
+}
+
+export function deleteClassSchedule(scheduleId) {
+  return request({
+    url: `/emp/sysClassSchedule/delete/${scheduleId}`,
+    method: 'delete'
+  })
+}
+
+export function getScheduleTeacherAssignmentOptions(classId) {
+  return request({
+    url: `/emp/sysClassSchedule/teacherAssignmentOptions/${classId}`,
+    method: 'get'
+  })
+}
+
+export function assignScheduleTeacher(data) {
+  return request({
+    url: '/emp/sysClassSchedule/assignTeacher',
+    method: 'put',
+    data
+  })
+}
+
+export function getTemporaryCourseOptions(classId) {
+  return request({
+    url: `/emp/sysClassSchedule/temporaryCourseOptions/${classId}`,
+    method: 'get'
+  })
+}
+
+export function addTemporaryCourse(data) {
+  return request({
+    url: '/emp/sysClassSchedule/temporaryCourse',
+    method: 'post',
+    data
+  })
+}
