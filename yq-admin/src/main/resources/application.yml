@@ -8,6 +8,13 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
 app:
+  oss:
+    endpoint: ${OSS_ENDPOINT:oss-cn-hangzhou.aliyuncs.com}
+    access-key-id: ${OSS_ACCESS_KEY_ID:your-access-key-id}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET:your-access-key-secret}
+    bucket-name: ${OSS_BUCKET_NAME:yq-platform}
+    upload-expire-seconds: ${OSS_UPLOAD_EXPIRE:300}
+    download-expire-seconds: ${OSS_DOWNLOAD_EXPIRE:3600}
   logging:
     path: ${APP_LOG_PATH:logs}
   permission-sync:

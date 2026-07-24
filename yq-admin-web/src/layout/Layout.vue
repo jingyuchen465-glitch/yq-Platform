@@ -26,16 +26,48 @@
 
       <p class="nav-cap">教务管理</p>
       <nav class="nav">
-        <router-link
+        <div
           v-for="item in eduMenuItems"
           :key="item.path"
-          :to="item.path"
-          class="nav-item"
-          :class="{ active: activeMenu === item.path }"
+          class="nav-entry"
         >
-          <i :class="item.icon"></i>
-          <span>{{ item.title }}</span>
-        </router-link>
+          <template v-if="item.children">
+            <button
+              type="button"
+              class="nav-item nav-group-toggle"
+              :class="{ active: isGroupActive(item) }"
+              :aria-expanded="String(isMenuOpen(item.path))"
+              @click="toggleMenu(item.path)"
+            >
+              <i :class="item.icon"></i>
+              <span>{{ item.title }}</span>
+              <i class="el-icon-arrow-down nav-arrow" :class="{ open: isMenuOpen(item.path) }"></i>
+            </button>
+            <transition name="submenu">
+              <div v-show="isMenuOpen(item.path)" class="submenu">
+                <router-link
+                  v-for="child in item.children"
+                  :key="child.path"
+                  :to="child.path"
+                  class="submenu-item"
+                  :class="{ active: activeMenu === child.path }"
+                >
+                  <i :class="child.icon"></i>
+                  <span>{{ child.title }}</span>
+                </router-link>
+              </div>
+            </transition>
+          </template>
+          <router-link
+            v-else
+            :to="item.path"
+            class="nav-item"
+            :class="{ active: activeMenu === item.path }"
+          >
+            <i :class="item.icon"></i>
+            <span>{{ item.title }}</span>
+          </router-link>
+        </div>
       </nav>
 
       <p class="nav-cap">系统设置</p>
@@ -103,6 +135,15 @@ export default {
         { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' },
         { path: '/course', title: '课程管理', icon: 'el-icon-reading' },
         { path: '/class', title: '班级管理', icon: 'el-icon-school' },
+        {
+          path: '/homework',
+          title: '作业管理',
+          icon: 'el-icon-edit-outline',
+          children: [
+            { path: '/homework', title: '作业发布台', icon: 'el-icon-s-promotion' },
+            { path: '/homework/status', title: '发布情况', icon: 'el-icon-data-analysis' }
+          ]
+        },
         { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },
         { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
       ],
@@ -111,7 +152,8 @@ export default {
       ],
       now: new Date(),
       timer: null,
-      logoutLoading: false
+      logoutLoading: false,
+      openMenus: { '/homework': true }
     }
   },
   computed: {
@@ -136,6 +178,15 @@ export default {
     }
   },
   methods: {
+    isGroupActive(item) {
+      return item.children.some(child => child.path === this.activeMenu)
+    },
+    isMenuOpen(path) {
+      return Boolean(this.openMenus[path])
+    },
+    toggleMenu(path) {
+      this.$set(this.openMenus, path, !this.isMenuOpen(path))
+    },
     clearLoginStorage() {
       localStorage.removeItem('yq_token')
       localStorage.removeItem('yq_sign_secret')
@@ -236,6 +287,7 @@ export default {
 }
 
 .nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; }
+.nav-entry { display: block; }
 .nav-item {
   position: relative;
   display: flex;
@@ -248,9 +300,26 @@ export default {
   text-decoration: none;
   transition: background-color .18s ease, color .18s ease;
 }
+.nav-group-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .nav-item i { font-size: 16px; transition: transform .18s ease; }
+.nav-item .nav-arrow {
+  margin-left: auto;
+  color: #71877A;
+  font-size: 12px;
+  transform: none;
+}
+.nav-item .nav-arrow.open { transform: rotate(180deg); }
 .nav-item:hover { background: var(--pine-2); color: #E8EFE9; }
 .nav-item:hover i { transform: translateX(2px); }
+.nav-item:hover .nav-arrow { transform: none; }
+.nav-item:hover .nav-arrow.open { transform: rotate(180deg); }
 .nav-item.active {
   background: var(--pine-3);
   color: #FFFFFF;
@@ -267,6 +336,35 @@ export default {
   border-radius: 0 3px 3px 0;
   background: var(--brass);
 }
+.submenu {
+  display: grid;
+  gap: 2px;
+  padding: 3px 0 5px 25px;
+}
+.submenu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #82968A;
+  font-size: 12.5px;
+  text-decoration: none;
+  transition: color .16s ease, background-color .16s ease;
+}
+.submenu-item > i {
+  width: 14px;
+  color: #71877A;
+  font-size: 12px;
+  text-align: center;
+}
+.submenu-item:hover { color: #E8EFE9; background: rgba(255, 255, 255, .045); }
+.submenu-item.active { color: #FFFFFF; background: rgba(185, 138, 47, .13); }
+.submenu-item.active > i { color: var(--brass); }
+.submenu-enter-active,
+.submenu-leave-active { transition: opacity .16s ease, transform .16s ease; }
+.submenu-enter,
+.submenu-leave-to { opacity: 0; transform: translateY(-4px); }
 
 .side-foot {
   margin-top: auto;
@@ -371,6 +469,10 @@ export default {
   .nav { padding: 0 8px; }
   .nav-item { justify-content: center; padding: 12px 0; }
   .nav-item span { display: none; }
+  .nav-item .nav-arrow { display: none; }
+  .submenu { padding: 2px 0 4px; }
+  .submenu-item { justify-content: center; padding: 9px 0; }
+  .submenu-item span { display: none; }
   .side-foot { justify-content: center; }
   .page-container { padding: 18px 14px 32px; }
 }

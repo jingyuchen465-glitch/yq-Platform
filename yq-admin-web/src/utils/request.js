@@ -105,7 +105,11 @@ service.interceptors.response.use(
       } else {
         Message({ message: res.message || '请求失败', type: 'error', duration: 3000 })
       }
-      return Promise.reject(new Error(res.message || '请求失败'))
+      const requestError = new Error(res.message || '请求失败')
+      // 保留后端业务码，页面可以针对无权限等预期异常展示友好的局部状态。
+      requestError.code = res.code
+      requestError.responseData = res
+      return Promise.reject(requestError)
     }
     return res
   },

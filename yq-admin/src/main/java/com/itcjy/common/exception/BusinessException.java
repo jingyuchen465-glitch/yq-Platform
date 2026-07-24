@@ -46,6 +46,12 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException PARSE_TIMESTAMP_ERROR = new BusinessException(18006, "时间戳格式错误");
 
 
+    public static final BusinessException HOMEWORK_EXIST = new BusinessException(19001, "Homework already exists");
+    public static final BusinessException HOMEWORK_SCHEDULE_NOT_EXIST = new BusinessException(19002, "Homework schedule not found");
+    public static final BusinessException HOMEWORK_TIME_ERROR = new BusinessException(19003, "Invalid homework time range");
+    public static final BusinessException HOMEWORK_NOT_EXIST = new BusinessException(19004, "Homework not found");
+    public static final BusinessException HOMEWORK_ANSWER_NOT_EXIST = new BusinessException(19005, "Homework answer not found");
+
     public BusinessException(String message) {
         super(message);
         this.code = 400;

@@ -78,6 +78,18 @@ const routes = [
         meta: { title: '班级管理', icon: 'el-icon-school' }
       },
       {
+        path: 'homework',
+        name: 'HomeworkPublish',
+        component: () => import('@/views/homework/HomeworkPublish.vue'),
+        meta: { title: '作业管理', icon: 'el-icon-edit-outline' }
+      },
+      {
+        path: 'homework/status',
+        name: 'HomeworkStatus',
+        component: () => import('@/views/homework/HomeworkStatus.vue'),
+        meta: { title: '作业发布情况', icon: 'el-icon-data-analysis' }
+      },
+      {
         path: 'teacher-schedule',
         name: 'TeacherSchedule',
         component: () => import('@/views/schedule/TeacherSchedule.vue'),
