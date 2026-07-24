@@ -158,7 +158,14 @@ export default {
           localStorage.setItem('yq_sign_secret', signSecret)
           localStorage.setItem('yq_user', JSON.stringify(userDetailRes))
           this.$message.success('登录成功，签名通道已建立')
-          this.$router.push('/')
+          const redirect = this.$route.query.redirect
+          const redirectPath = typeof redirect === 'string' ? redirect.split(/[?#]/)[0] : ''
+          const target = typeof redirect === 'string' &&
+            /^\/(?![\\/])/.test(redirect) &&
+            redirectPath !== '/login'
+            ? redirect
+            : '/'
+          this.$router.push(target)
         } catch (e) {
           // 错误已由拦截器统一提示
         } finally {

@@ -5,17 +5,8 @@ public class ClassScheduleConstants {
     private ClassScheduleConstants() {
     }
 
-    /**
-     * 默认排课规则：周一、二、三、五、六上课，周四自习，周日休息，法定节假日休息。
-     */
-    public static final String RULE_CONFIG = """
-            {
-              "classDays": [1, 2, 3, 5, 6],
-              "selfStudyDays": [4],
-              "restDays": [7],
-              "holidayRest": true
-            }
-            """;
+    /** 数据库中的排课规则配置类型编码。 */
+    public static final String CONFIG_TYPE_CODE = "CLASS_SCHEDULE_RULE";
 
     /**
      * 课表中每天可能的类型
@@ -34,20 +25,18 @@ public class ClassScheduleConstants {
         public static final String HOLIDAY = "HOLIDAY";
     }
 
-    /**
-     * 课表规则配置 JSON 字段名
-     */
-    public static final class RuleField {
-        private RuleField() {
+    /** 排课规则数据库配置项键。 */
+    public static final class RuleKey {
+        private RuleKey() {
         }
 
         /** 上课日（星期几集合，1=周一 ... 7=周日） */
-        public static final String CLASS_DAYS = "classDays";
+        public static final String CLASS_DAYS = "CLASSDAYS";
         /** 自习日（星期几集合） */
-        public static final String SELF_STUDY_DAYS = "selfStudyDays";
+        public static final String SELF_STUDY_DAYS = "SELFSTUDYDAYS";
         /** 固定休息日（星期几集合） */
-        public static final String REST_DAYS = "restDays";
+        public static final String REST_DAYS = "RESTDAYS";
         /** 法定节假日是否自动休息 */
-        public static final String HOLIDAY_REST = "holidayRest";
+        public static final String HOLIDAY_REST = "HOLIDAYREST";
     }
 }

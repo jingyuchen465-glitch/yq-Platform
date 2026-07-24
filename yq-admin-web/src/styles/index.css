@@ -303,6 +303,9 @@ html, body, #app {
 .el-message-box { border-radius: 12px; }
 .el-message-box__title { font-family: var(--font-display); font-weight: 700; }
 .el-message-box__wrapper { background-color: rgba(13, 43, 33, .45); }
+.auth-expired-dialog { border-top: 3px solid var(--brass); }
+.auth-expired-dialog .el-message-box__status { color: var(--brass-ink); }
+.auth-expired-dialog .el-message-box__message { color: var(--ink-2); line-height: 1.7; }
 
 /* ---------- 描述列表（权限详情） ---------- */
 .el-descriptions-item__label {

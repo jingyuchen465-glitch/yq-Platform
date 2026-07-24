@@ -1,8 +1,6 @@
 package com.itcjy.emp.service.impl.academic;
 
 import cn.hutool.core.util.StrUtil;
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.itcjy.common.constants.ClassScheduleConstants;
@@ -32,7 +30,9 @@ import com.itcjy.emp.pojo.res.academic.SysClassScheduleTeacherAssignRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTeacherAssignmentOptionsRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTemporaryCourseOptionsRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTemporaryCourseRes;
+import com.itcjy.emp.pojo.res.system.ClassScheduleRuleRes;
 import com.itcjy.emp.service.academic.ISysClassScheduleService;
+import com.itcjy.emp.service.system.ISysConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +65,7 @@ public class SysClassScheduleServiceImpl extends ServiceImpl<SysClassScheduleMap
     private final SysRoleMapper sysRoleMapper;
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final ISysConfigService sysConfigService;
     private final HolidayUtil holidayUtil;
     private final TransactionTemplate transactionTemplate;
 
@@ -425,6 +426,9 @@ public class SysClassScheduleServiceImpl extends ServiceImpl<SysClassScheduleMap
         return new SysClassScheduleTemporaryCourseOptionsRes(stageOptions, teacherOptions);
     }
 
+    /**
+     * 在指定日期增加临时课程；若目标日期已有课程，则按现有排课规则顺延后续课程。
+     */
     @Override
     public SysClassScheduleTemporaryCourseRes addTemporaryCourse(SysClassScheduleTemporaryCourseReq req) {
         SysClass sysClass = requireClass(req.classId());
@@ -1067,40 +1071,17 @@ public class SysClassScheduleServiceImpl extends ServiceImpl<SysClassScheduleMap
     }
 
     private ScheduleRule loadRule() {
-        JSONObject config = JSON.parseObject(ClassScheduleConstants.RULE_CONFIG);
-        if (config == null) {
-            throw BusinessException.CLASS_SCHEDULE_ERROR.newInstance("排课规则配置不存在");
-        }
-        Set<Integer> classDays = readDaySet(config, ClassScheduleConstants.RuleField.CLASS_DAYS);
-        Set<Integer> selfStudyDays = readDaySet(config, ClassScheduleConstants.RuleField.SELF_STUDY_DAYS);
-        Set<Integer> restDays = readDaySet(config, ClassScheduleConstants.RuleField.REST_DAYS);
-        Boolean holidayRest = config.getBoolean(ClassScheduleConstants.RuleField.HOLIDAY_REST);
-        validateRule(classDays, selfStudyDays, restDays, holidayRest);
-        return new ScheduleRule(classDays, selfStudyDays, restDays, holidayRest);
-    }
-
-    private Set<Integer> readDaySet(JSONObject config, String fieldName) {
-        List<Integer> days = config.getList(fieldName, Integer.class);
-        return days == null ? Set.of() : Set.copyOf(days);
-    }
-
-    private void validateRule(
-            Set<Integer> classDays,
-            Set<Integer> selfStudyDays,
-            Set<Integer> restDays,
-            Boolean holidayRest) {
-        if (classDays.isEmpty() || holidayRest == null) {
+        ClassScheduleRuleRes config = sysConfigService.getClassScheduleRule();
+        // 配置服务负责校验星期范围、互斥关系和完整覆盖；此处防御服务契约被未来实现破坏。
+        if (config == null || config.classDays() == null
+                || config.selfStudyDays() == null || config.restDays() == null) {
             throw BusinessException.CLASS_SCHEDULE_ERROR.newInstance("排课规则配置不完整");
         }
-        Set<Integer> allDays = new HashSet<>();
-        allDays.addAll(classDays);
-        allDays.addAll(selfStudyDays);
-        allDays.addAll(restDays);
-        boolean validRange = allDays.stream().allMatch(day -> day >= 1 && day <= 7);
-        int configuredCount = classDays.size() + selfStudyDays.size() + restDays.size();
-        if (!validRange || allDays.size() != configuredCount || allDays.size() != 7) {
-            throw BusinessException.CLASS_SCHEDULE_ERROR.newInstance("排课规则中的星期配置无效或存在重复");
-        }
+        return new ScheduleRule(
+                Set.copyOf(config.classDays()),
+                Set.copyOf(config.selfStudyDays()),
+                Set.copyOf(config.restDays()),
+                config.holidayRest());
     }
 
     private HolidayInfo getHolidayInfo(LocalDate date) {

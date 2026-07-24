@@ -1,8 +1,33 @@
 import Vue from 'vue'
-import VueRouter from 'vue-router'
+import VueRouter, { isNavigationFailure } from 'vue-router'
 import Layout from '@/layout/Layout.vue'
 
 Vue.use(VueRouter)
+
+// Vue Router 3 会将重复、重定向或被新导航取消的正常流程作为 Promise reject 返回。
+// 统一吸收这类预期结果，避免开发环境把登录重定向显示成整页运行时错误。
+function wrapNavigationMethod(methodName) {
+  const originalMethod = VueRouter.prototype[methodName]
+  VueRouter.prototype[methodName] = function navigation(location, onResolve, onReject) {
+    if (onResolve || onReject) {
+      return originalMethod.call(this, location, onResolve, onReject)
+    }
+    return originalMethod.call(this, location).catch(error => {
+      if (isNavigationFailure(error)) return error
+      return Promise.reject(error)
+    })
+  }
+}
+
+if (!VueRouter.prototype.__yqNavigationFailureHandled) {
+  wrapNavigationMethod('push')
+  wrapNavigationMethod('replace')
+  Object.defineProperty(VueRouter.prototype, '__yqNavigationFailureHandled', {
+    value: true,
+    configurable: false,
+    enumerable: false
+  })
+}
 
 const routes = [
   {
@@ -51,6 +76,12 @@ const routes = [
         name: 'ClassManage',
         component: () => import('@/views/class/ClassManage.vue'),
         meta: { title: '班级管理', icon: 'el-icon-school' }
+      },
+      {
+        path: 'teacher-schedule',
+        name: 'TeacherSchedule',
+        component: () => import('@/views/schedule/TeacherSchedule.vue'),
+        meta: { title: '教师课表', icon: 'el-icon-date' }
       },
       {
         path: 'course-detail/:courseId',

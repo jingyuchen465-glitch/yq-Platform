@@ -1,4 +1,5 @@
 const { defineConfig } = require('@vue/cli-service')
+const apiTarget = process.env.YQ_API_TARGET || 'http://localhost:8080'
 
 module.exports = defineConfig({
   transpileDependencies: true,
@@ -7,7 +8,7 @@ module.exports = defineConfig({
     port: 5173,
     proxy: {
       '/yq-admin': {
-        target: 'http://localhost:8080',
+        target: apiTarget,
         changeOrigin: true
       }
     }

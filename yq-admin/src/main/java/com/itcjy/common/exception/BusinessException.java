@@ -19,6 +19,7 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException ROLE_NOT_EXIST = new BusinessException(12002, "Role not found");
     public static final BusinessException CONFIG_EXIST = new BusinessException(13001, "Config already exists");
     public static final BusinessException CONFIG_NOT_EXIST = new BusinessException(13002, "Config not found");
+    public static final BusinessException CONFIG_ERROR = new BusinessException(13003, "Invalid config");
     public static final BusinessException CAMPUS_NOT_EXIST = new BusinessException(14001, "Campus not found");
     public static final BusinessException COURSE_NOT_EXIST = new BusinessException(15001, "Course not found");
     public static final BusinessException COURSE_DETAIL_NOT_EXIST = new BusinessException(15002, "Course detail not found");

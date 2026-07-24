@@ -27,6 +27,8 @@ import com.itcjy.emp.pojo.res.academic.SysClassScheduleRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTeacherAssignRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTemporaryCourseRes;
 import com.itcjy.emp.pojo.res.academic.SysClassScheduleTemporaryCourseOptionsRes;
+import com.itcjy.emp.pojo.res.system.ClassScheduleRuleRes;
+import com.itcjy.emp.service.system.ISysConfigService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +56,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -76,6 +79,8 @@ class SysClassScheduleServiceImplTest {
     @Mock
     private SysUserRoleMapper sysUserRoleMapper;
     @Mock
+    private ISysConfigService sysConfigService;
+    @Mock
     private HolidayUtil holidayUtil;
     @Mock
     private TransactionTemplate transactionTemplate;
@@ -95,9 +100,12 @@ class SysClassScheduleServiceImplTest {
                 sysRoleMapper,
                 sysUserMapper,
                 sysUserRoleMapper,
+                sysConfigService,
                 holidayUtil,
                 transactionTemplate));
         ReflectionTestUtils.setField(service, "baseMapper", sysClassScheduleMapper);
+        lenient().when(sysConfigService.getClassScheduleRule()).thenReturn(new ClassScheduleRuleRes(
+                List.of(1, 2, 3, 5, 6), List.of(4), List.of(7), true));
     }
 
     @Test
