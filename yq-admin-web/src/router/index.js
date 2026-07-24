@@ -90,6 +90,12 @@ const routes = [
         meta: { title: '值班管理', icon: 'el-icon-alarm-clock' }
       },
       {
+        path: 'config',
+        name: 'ConfigManage',
+        component: () => import('@/views/config/ConfigManage.vue'),
+        meta: { title: '规则配置', icon: 'el-icon-setting' }
+      },
+      {
         path: 'course-detail/:courseId',
         name: 'CourseDetailManage',
         component: () => import('@/views/course/CourseDetailManage.vue'),

@@ -38,6 +38,20 @@
         </router-link>
       </nav>
 
+      <p class="nav-cap">系统设置</p>
+      <nav class="nav">
+        <router-link
+          v-for="item in systemMenuItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: activeMenu === item.path }"
+        >
+          <i :class="item.icon"></i>
+          <span>{{ item.title }}</span>
+        </router-link>
+      </nav>
+
       <div class="side-foot">
         <span class="live-dot"></span>
         <span class="mono">dev · localhost:8080</span>
@@ -91,6 +105,9 @@ export default {
         { path: '/class', title: '班级管理', icon: 'el-icon-school' },
         { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },
         { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
+      ],
+      systemMenuItems: [
+        { path: '/config', title: '规则配置', icon: 'el-icon-setting' }
       ],
       now: new Date(),
       timer: null,

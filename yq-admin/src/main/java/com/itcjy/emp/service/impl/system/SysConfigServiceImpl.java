@@ -57,6 +57,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void addType(SysConfigTypeReq req) {
         String typeCode = normalizeCode(req.typeCode());
         ensureTypeCodeUnique(null, typeCode);
@@ -67,6 +68,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateType(Long id, SysConfigTypeReq req) {
         SysConfigType type = requireType(id);
         String typeCode = normalizeCode(req.typeCode());
@@ -118,6 +120,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void addItem(SysConfigItemReq req) {
         SysConfigType type = requireType(req.typeId());
         String itemKey = normalizeCode(req.itemKey());
@@ -129,6 +132,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateItem(Long id, SysConfigItemReq req) {
         SysConfigItem item = requireItem(id);
         SysConfigType oldType = requireType(item.getTypeId());
@@ -151,6 +155,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteItem(Long id) {
         SysConfigItem item = requireItem(id);
         SysConfigType type = requireType(item.getTypeId());
