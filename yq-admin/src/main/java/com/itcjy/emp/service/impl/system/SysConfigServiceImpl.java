@@ -23,9 +23,15 @@ import com.itcjy.emp.pojo.res.system.SysConfigItemRes;
 import com.itcjy.emp.pojo.res.system.SysConfigTypeRes;
 import com.itcjy.emp.service.system.ISysConfigService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -36,8 +42,10 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SysConfigServiceImpl implements ISysConfigService {
-
+    private static final String CLASS_SCHEDULE_RULE_CACHE_KEY = "sys_config:class_schedule_rule";
+    private static final Duration CLASS_SCHEDULE_RULE_CACHE_TTL = Duration.ofHours(24);
     private static final Set<String> REQUIRED_SCHEDULE_KEYS = Set.of(
             ClassScheduleConstants.RuleKey.CLASS_DAYS,
             ClassScheduleConstants.RuleKey.SELF_STUDY_DAYS,
@@ -46,6 +54,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
 
     private final SysConfigTypeMapper configTypeMapper;
     private final SysConfigItemMapper configItemMapper;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
     public void addType(SysConfigTypeReq req) {
@@ -54,6 +63,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
         SysConfigType type = new SysConfigType();
         applyType(type, req, typeCode);
         configTypeMapper.insert(type);
+        invalidateScheduleRuleCacheAfterCommitIf(isScheduleType(type));
     }
 
     @Override
@@ -66,8 +76,11 @@ public class SysConfigServiceImpl implements ISysConfigService {
             throw BusinessException.CONFIG_ERROR.newInstance("内置排课规则不能改编码或停用");
         }
         ensureTypeCodeUnique(id, typeCode);
+        boolean affectsScheduleRule = isScheduleType(type)
+                || ClassScheduleConstants.CONFIG_TYPE_CODE.equals(typeCode);
         applyType(type, req, typeCode);
         configTypeMapper.updateById(type);
+        invalidateScheduleRuleCacheAfterCommitIf(affectsScheduleRule);
     }
 
     @Override
@@ -106,19 +119,20 @@ public class SysConfigServiceImpl implements ISysConfigService {
 
     @Override
     public void addItem(SysConfigItemReq req) {
-        requireType(req.typeId());
+        SysConfigType type = requireType(req.typeId());
         String itemKey = normalizeCode(req.itemKey());
         ensureItemKeyUnique(null, req.typeId(), itemKey);
         SysConfigItem item = new SysConfigItem();
         applyItem(item, req, itemKey);
         configItemMapper.insert(item);
+        invalidateScheduleRuleCacheAfterCommitIf(isScheduleType(type));
     }
 
     @Override
     public void updateItem(Long id, SysConfigItemReq req) {
         SysConfigItem item = requireItem(id);
         SysConfigType oldType = requireType(item.getTypeId());
-        requireType(req.typeId());
+        SysConfigType newType = requireType(req.typeId());
         String itemKey = normalizeCode(req.itemKey());
         if (isRequiredScheduleItem(oldType, item)) {
             boolean immutableChanged = !item.getTypeId().equals(req.typeId())
@@ -133,15 +147,18 @@ public class SysConfigServiceImpl implements ISysConfigService {
         ensureItemKeyUnique(id, req.typeId(), itemKey);
         applyItem(item, req, itemKey);
         configItemMapper.updateById(item);
+        invalidateScheduleRuleCacheAfterCommitIf(isScheduleType(oldType) || isScheduleType(newType));
     }
 
     @Override
     public void deleteItem(Long id) {
         SysConfigItem item = requireItem(id);
-        if (isRequiredScheduleItem(requireType(item.getTypeId()), item)) {
+        SysConfigType type = requireType(item.getTypeId());
+        if (isRequiredScheduleItem(type, item)) {
             throw BusinessException.CONFIG_ERROR.newInstance("内置排课规则配置项不能删除");
         }
         configItemMapper.deleteById(id);
+        invalidateScheduleRuleCacheAfterCommitIf(isScheduleType(type));
     }
 
     @Override
@@ -172,8 +189,23 @@ public class SysConfigServiceImpl implements ISysConfigService {
                 .map(SysConfigItemRes::from).toList();
     }
 
+    /**
+     * 获取排课规则
+     * @return
+     */
     @Override
     public ClassScheduleRuleRes getClassScheduleRule() {
+        ClassScheduleRuleRes cachedRule = getCachedClassScheduleRule();
+        if (cachedRule != null) {
+            return cachedRule;
+        }
+
+        ClassScheduleRuleRes databaseRule = loadClassScheduleRuleFromDatabase();
+        cacheClassScheduleRule(databaseRule);
+        return databaseRule;
+    }
+
+    private ClassScheduleRuleRes loadClassScheduleRuleFromDatabase() {
         SysConfigType type = configTypeMapper.selectOne(Wrappers.<SysConfigType>lambdaQuery()
                 .eq(SysConfigType::getTypeCode, ClassScheduleConstants.CONFIG_TYPE_CODE)
                 .eq(SysConfigType::getStatus, ActiveEnum.ACTIVE.name()));
@@ -203,6 +235,92 @@ public class SysConfigServiceImpl implements ISysConfigService {
         updateItemValue(items, ClassScheduleConstants.RuleKey.SELF_STUDY_DAYS, joinDays(req.selfStudyDays()));
         updateItemValue(items, ClassScheduleConstants.RuleKey.REST_DAYS, joinDays(req.restDays()));
         updateItemValue(items, ClassScheduleConstants.RuleKey.HOLIDAY_REST, req.holidayRest().toString());
+        ClassScheduleRuleRes updatedRule = new ClassScheduleRuleRes(
+                sortedDays(req.classDays()),
+                sortedDays(req.selfStudyDays()),
+                sortedDays(req.restDays()),
+                req.holidayRest());
+        runAfterCommit(() -> cacheClassScheduleRule(updatedRule));
+    }
+
+    private ClassScheduleRuleRes getCachedClassScheduleRule() {
+        try {
+            Map<Object, Object> cachedItems = redisTemplate.opsForHash()
+                    .entries(CLASS_SCHEDULE_RULE_CACHE_KEY);
+            if (cachedItems.isEmpty()) {
+                return null;
+            }
+
+            Map<String, String> values = new LinkedHashMap<>();
+            for (String key : REQUIRED_SCHEDULE_KEYS) {
+                Object value = cachedItems.get(key);
+                if (value == null) {
+                    log.warn("Incomplete class schedule rule cache, evicting key: {}",
+                            CLASS_SCHEDULE_RULE_CACHE_KEY);
+                    deleteScheduleRuleCache();
+                    return null;
+                }
+                values.put(key, value.toString());
+            }
+            return toClassScheduleRule(values);
+        } catch (BusinessException ex) {
+            log.warn("Invalid class schedule rule cache, falling back to database", ex);
+            deleteScheduleRuleCache();
+            return null;
+        } catch (DataAccessException ex) {
+            log.warn("Failed to read class schedule rule cache, falling back to database", ex);
+            return null;
+        }
+    }
+
+    private void cacheClassScheduleRule(ClassScheduleRuleRes rule) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put(ClassScheduleConstants.RuleKey.CLASS_DAYS, joinDays(rule.classDays()));
+        values.put(ClassScheduleConstants.RuleKey.SELF_STUDY_DAYS, joinDays(rule.selfStudyDays()));
+        values.put(ClassScheduleConstants.RuleKey.REST_DAYS, joinDays(rule.restDays()));
+        values.put(ClassScheduleConstants.RuleKey.HOLIDAY_REST, Boolean.toString(rule.holidayRest()));
+        try {
+            redisTemplate.opsForHash().putAll(CLASS_SCHEDULE_RULE_CACHE_KEY, values);
+            redisTemplate.expire(CLASS_SCHEDULE_RULE_CACHE_KEY, CLASS_SCHEDULE_RULE_CACHE_TTL);
+        } catch (DataAccessException ex) {
+            log.warn("Failed to cache class schedule rule", ex);
+        }
+    }
+
+    private ClassScheduleRuleRes toClassScheduleRule(Map<String, String> values) {
+        List<Integer> classDays = parseIntegerList(values.get(ClassScheduleConstants.RuleKey.CLASS_DAYS));
+        List<Integer> selfStudyDays = parseIntegerList(values.get(ClassScheduleConstants.RuleKey.SELF_STUDY_DAYS));
+        List<Integer> restDays = parseIntegerList(values.get(ClassScheduleConstants.RuleKey.REST_DAYS));
+        boolean holidayRest = parseBoolean(values.get(ClassScheduleConstants.RuleKey.HOLIDAY_REST));
+        validateWeekRule(classDays, selfStudyDays, restDays);
+        return new ClassScheduleRuleRes(classDays, selfStudyDays, restDays, holidayRest);
+    }
+
+    private void invalidateScheduleRuleCacheAfterCommitIf(boolean shouldInvalidate) {
+        if (shouldInvalidate) {
+            runAfterCommit(this::deleteScheduleRuleCache);
+        }
+    }
+
+    private void deleteScheduleRuleCache() {
+        try {
+            redisTemplate.delete(CLASS_SCHEDULE_RULE_CACHE_KEY);
+        } catch (DataAccessException ex) {
+            log.warn("Failed to evict class schedule rule cache", ex);
+        }
+    }
+
+    private void runAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void applyType(SysConfigType type, SysConfigTypeReq req, String typeCode) {
@@ -302,6 +420,10 @@ public class SysConfigServiceImpl implements ISysConfigService {
                 .sorted()
                 .map(String::valueOf)
                 .collect(Collectors.joining(","));
+    }
+
+    private List<Integer> sortedDays(List<Integer> days) {
+        return days.stream().sorted().toList();
     }
 
     private SysConfigType requireType(Long id) {

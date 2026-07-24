@@ -5,11 +5,13 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.itcjy.common.constants.ClassScheduleConstants;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.myEnum.ActiveEnum;
+import com.itcjy.common.myEnum.ConfigValueTypeEnum;
 import com.itcjy.emp.mapper.system.SysConfigItemMapper;
 import com.itcjy.emp.mapper.system.SysConfigTypeMapper;
 import com.itcjy.emp.pojo.entity.SysConfigItem;
 import com.itcjy.emp.pojo.entity.SysConfigType;
 import com.itcjy.emp.pojo.req.system.ClassScheduleRuleReq;
+import com.itcjy.emp.pojo.req.system.SysConfigItemReq;
 import com.itcjy.emp.pojo.res.system.ClassScheduleRuleRes;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,14 +20,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +46,10 @@ class SysConfigServiceImplTest {
     private SysConfigTypeMapper configTypeMapper;
     @Mock
     private SysConfigItemMapper configItemMapper;
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+    @Mock
+    private HashOperations<String, Object, Object> hashOperations;
 
     private SysConfigServiceImpl service;
 
@@ -42,7 +57,26 @@ class SysConfigServiceImplTest {
     void setUp() {
         initTableInfo(SysConfigType.class);
         initTableInfo(SysConfigItem.class);
-        service = new SysConfigServiceImpl(configTypeMapper, configItemMapper);
+        lenient().when(redisTemplate.opsForHash()).thenReturn(hashOperations);
+        lenient().when(hashOperations.entries(anyString())).thenReturn(Map.of());
+        service = new SysConfigServiceImpl(configTypeMapper, configItemMapper, redisTemplate);
+    }
+
+    @Test
+    void shouldReadClassScheduleRuleFromRedisWithoutQueryingDatabase() {
+        when(hashOperations.entries("sys_config:class_schedule_rule")).thenReturn(Map.of(
+                ClassScheduleConstants.RuleKey.CLASS_DAYS, "1,2,3,5,6",
+                ClassScheduleConstants.RuleKey.SELF_STUDY_DAYS, "4",
+                ClassScheduleConstants.RuleKey.REST_DAYS, "7",
+                ClassScheduleConstants.RuleKey.HOLIDAY_REST, "true"));
+
+        ClassScheduleRuleRes result = service.getClassScheduleRule();
+
+        assertThat(result.classDays()).containsExactly(1, 2, 3, 5, 6);
+        assertThat(result.selfStudyDays()).containsExactly(4);
+        assertThat(result.restDays()).containsExactly(7);
+        assertThat(result.holidayRest()).isTrue();
+        verifyNoInteractions(configTypeMapper, configItemMapper);
     }
 
     @Test
@@ -61,6 +95,8 @@ class SysConfigServiceImplTest {
         assertThat(result.selfStudyDays()).containsExactly(4);
         assertThat(result.restDays()).containsExactly(7);
         assertThat(result.holidayRest()).isTrue();
+        verify(hashOperations).putAll(eq("sys_config:class_schedule_rule"), anyMap());
+        verify(redisTemplate).expire("sys_config:class_schedule_rule", Duration.ofHours(24));
     }
 
     @Test
@@ -104,6 +140,28 @@ class SysConfigServiceImplTest {
         verify(configItemMapper, org.mockito.Mockito.times(4)).updateById(captor.capture());
         assertThat(captor.getAllValues()).extracting(SysConfigItem::getItemValue)
                 .containsExactly("1,2,3,4,5", "6", "7", "false");
+        verify(hashOperations).putAll(eq("sys_config:class_schedule_rule"), anyMap());
+        verify(redisTemplate).expire("sys_config:class_schedule_rule", Duration.ofHours(24));
+    }
+
+    @Test
+    void shouldEvictClassScheduleRuleCacheWhenScheduleItemIsAdded() {
+        SysConfigType type = scheduleType();
+        when(configTypeMapper.selectById(type.getId())).thenReturn(type);
+        when(configItemMapper.selectCount(any())).thenReturn(0L);
+        SysConfigItemReq req = new SysConfigItemReq(
+                type.getId(),
+                "EXTRA_RULE",
+                "value",
+                ConfigValueTypeEnum.STRING.name(),
+                null,
+                ActiveEnum.ACTIVE.name(),
+                10);
+
+        service.addItem(req);
+
+        verify(configItemMapper).insert(any(SysConfigItem.class));
+        verify(redisTemplate).delete("sys_config:class_schedule_rule");
     }
 
     @Test
