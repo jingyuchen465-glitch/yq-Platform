@@ -2,6 +2,7 @@ package com.itcjy.emp.mapper.academic;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.itcjy.emp.pojo.entity.SysClassSchedule;
+import com.itcjy.emp.pojo.projection.ClassTeachingPeriodRow;
 import com.itcjy.emp.pojo.projection.TeacherScheduleRow;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -45,4 +46,31 @@ public interface SysClassScheduleMapper extends BaseMapper<SysClassSchedule> {
     List<TeacherScheduleRow> selectTeacherScheduleRows(@Param("teacherId") Long teacherId,
                                                        @Param("startDate") LocalDate startDate,
                                                        @Param("endDate") LocalDate endDate);
+
+    @Select("""
+            SELECT c.id AS class_id,
+                   c.class_period AS class_name,
+                   c.campus_id,
+                   MIN(s.schedule_date) AS teaching_start_date,
+                   MAX(s.schedule_date) AS teaching_end_date
+            FROM sys_class c
+            LEFT JOIN sys_class_schedule s ON s.class_id = c.id
+            WHERE c.campus_id = #{campusId}
+            GROUP BY c.id, c.class_period, c.campus_id
+            ORDER BY c.id ASC
+            """)
+    List<ClassTeachingPeriodRow> selectClassTeachingPeriods(@Param("campusId") Long campusId);
+
+    @Select("""
+            SELECT c.id AS class_id,
+                   c.class_period AS class_name,
+                   c.campus_id,
+                   MIN(s.schedule_date) AS teaching_start_date,
+                   MAX(s.schedule_date) AS teaching_end_date
+            FROM sys_class c
+            LEFT JOIN sys_class_schedule s ON s.class_id = c.id
+            WHERE c.id = #{classId}
+            GROUP BY c.id, c.class_period, c.campus_id
+            """)
+    ClassTeachingPeriodRow selectClassTeachingPeriod(@Param("classId") Long classId);
 }

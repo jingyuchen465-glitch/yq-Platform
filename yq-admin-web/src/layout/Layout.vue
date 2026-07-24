@@ -89,7 +89,8 @@ export default {
         { path: '/campus', title: '校区管理', icon: 'el-icon-office-building' },
         { path: '/course', title: '课程管理', icon: 'el-icon-reading' },
         { path: '/class', title: '班级管理', icon: 'el-icon-school' },
-        { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' }
+        { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },
+        { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
       ],
       now: new Date(),
       timer: null,

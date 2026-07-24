@@ -84,6 +84,12 @@ const routes = [
         meta: { title: '教师课表', icon: 'el-icon-date' }
       },
       {
+        path: 'class-duty',
+        name: 'ClassDutyManage',
+        component: () => import('@/views/duty/ClassDutyManage.vue'),
+        meta: { title: '值班管理', icon: 'el-icon-alarm-clock' }
+      },
+      {
         path: 'course-detail/:courseId',
         name: 'CourseDetailManage',
         component: () => import('@/views/course/CourseDetailManage.vue'),
