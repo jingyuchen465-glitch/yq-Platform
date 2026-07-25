@@ -531,7 +531,7 @@ export default {
       this.answerPreviewHtml = ''
       this.revokeAnswerPreviewUrl()
       try {
-        const url = await getOssDownloadUrl(this.answerPreviewTarget.answerObjectKey)
+        const url = await getOssDownloadUrl(this.answerPreviewTarget.answerObjectKey, true)
         const response = await fetch(url)
         if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`)
         const blob = await response.blob()

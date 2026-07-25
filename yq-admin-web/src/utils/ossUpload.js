@@ -92,29 +92,30 @@ export function uploadToOssWithProgress(file, bizType, onProgress) {
 /**
  * 获取文件的预签名下载 URL
  * @param {string} objectKey - 文件在 OSS 中的路径
+ * @param {boolean} [preview=false] - 是否为预览模式（true=浏览器内联展示，false=强制下载）
  * @returns {Promise<string>} 预签名下载 URL
  */
-export async function getOssDownloadUrl(objectKey) {
-  const res = await getDownloadUrl({ objectKey })
+export async function getOssDownloadUrl(objectKey, preview = false) {
+  const res = await getDownloadUrl({ objectKey, preview })
   return res.data.downloadUrl
 }
 
 /**
- * 在新窗口打开文件预览/下载
+ * 在新窗口打开文件预览（浏览器内联展示）
  * @param {string} objectKey - 文件在 OSS 中的路径
  */
 export async function previewOssFile(objectKey) {
-  const url = await getOssDownloadUrl(objectKey)
+  const url = await getOssDownloadUrl(objectKey, true)
   window.open(url, '_blank')
 }
 
 /**
- * 触发文件下载
+ * 触发文件下载（强制下载）
  * @param {string} objectKey - 文件在 OSS 中的路径
  * @param {string} [fileName] - 下载时的文件名
  */
 export async function downloadOssFile(objectKey, fileName) {
-  const url = await getOssDownloadUrl(objectKey)
+  const url = await getOssDownloadUrl(objectKey, false)
   const link = document.createElement('a')
   link.href = url
   if (fileName) {

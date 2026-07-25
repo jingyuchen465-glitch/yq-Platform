@@ -3,6 +3,7 @@ package com.itcjy.emp.service.impl.oss;
 import com.aliyun.oss.HttpMethod;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.model.GeneratePresignedUrlRequest;
+import com.aliyun.oss.model.ResponseHeaderOverrides;
 import com.itcjy.common.properties.OssProperties;
 import com.itcjy.emp.pojo.req.oss.OssDownloadUrlReq;
 import com.itcjy.emp.pojo.req.oss.OssUploadUrlReq;
@@ -61,10 +62,31 @@ public class OssServiceImpl implements IOssService {
                 ossProperties.getBucketName(), req.getObjectKey(), HttpMethod.GET);
         request.setExpiration(expiration);
 
+        // 根据 preview 参数设置 Content-Disposition 响应头
+        ResponseHeaderOverrides headers = new ResponseHeaderOverrides();
+        if (Boolean.TRUE.equals(req.getPreview())) {
+            headers.setContentDisposition("inline");
+        } else {
+            String fileName = extractFileName(req.getObjectKey());
+            headers.setContentDisposition("attachment; filename=\"" + fileName + "\"");
+        }
+        request.setResponseHeaders(headers);
+
         URL url = ossClient.generatePresignedUrl(request);
-        log.info("生成预签名下载URL, objectKey={}, expireSeconds={}", req.getObjectKey(), ossProperties.getDownloadExpireSeconds());
+        log.info("生成预签名下载URL, objectKey={}, preview={}, expireSeconds={}",
+                req.getObjectKey(), req.getPreview(), ossProperties.getDownloadExpireSeconds());
 
         return new OssDownloadUrlRes(url.toString(), ossProperties.getDownloadExpireSeconds());
+    }
+
+    /**
+     * 从 objectKey 中提取文件名（最后一段路径）
+     */
+    private String extractFileName(String objectKey) {
+        if (objectKey == null || !objectKey.contains("/")) {
+            return objectKey == null ? "download" : objectKey;
+        }
+        return objectKey.substring(objectKey.lastIndexOf('/') + 1);
     }
 
     /**

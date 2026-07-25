@@ -111,32 +111,104 @@
     </el-dialog>
 
     <!-- 权限授权弹窗 -->
-    <el-dialog title="角色授权" :visible.sync="permDialogVisible" width="560px">
-      <div v-loading="permLoading">
-        <p style="margin-bottom: 12px; color: #666;">
-          为角色 <b>{{ currentRole.roleName }}（{{ currentRole.roleCode }}）</b> 分配权限：
-        </p>
-        <div style="margin-bottom: 10px;">
-          <el-button size="mini" @click="handleCheckAll">全选</el-button>
-          <el-button size="mini" @click="selectedPermIds = []">清空</el-button>
-          <span style="margin-left: 10px; color: #999; font-size: 12px;">已选 {{ selectedPermIds.length }} 项</span>
+    <el-dialog
+      title="角色授权"
+      :visible.sync="permDialogVisible"
+      width="780px"
+      custom-class="role-permission-dialog"
+      @closed="resetPermissionDialog"
+    >
+      <div v-loading="permLoading" class="permission-assignment">
+        <div class="assignment-brief">
+          <span class="role-key" aria-hidden="true"><i class="el-icon-key"></i></span>
+          <div class="role-identity">
+            <span>正在为角色分配权限</span>
+            <strong>{{ currentRole.roleName }}</strong>
+            <code>{{ currentRole.roleCode }}</code>
+          </div>
+          <div class="selection-total" aria-live="polite">
+            <b>{{ selectedPermIds.length }}</b>
+            <span>/ {{ permissionTotal }} 项已选</span>
+          </div>
         </div>
-        <el-table
-          ref="permTable"
-          :data="allPermissions"
-          border
-          max-height="360"
-          @selection-change="handlePermSelectionChange"
-        >
-          <el-table-column type="selection" width="45" align="center" />
-          <el-table-column prop="permissionCode" label="权限编码" min-width="160" show-overflow-tooltip />
-          <el-table-column prop="permissionName" label="权限名称" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="apiPath" label="API路径" min-width="180" show-overflow-tooltip />
-        </el-table>
+
+        <div class="assignment-tools">
+          <el-input
+            v-model.trim="permKeyword"
+            size="small"
+            clearable
+            prefix-icon="el-icon-search"
+            placeholder="搜索分类、权限编码、名称或 API"
+            @input="filterPermissionTree"
+          />
+          <div class="batch-actions">
+            <el-button size="mini" icon="el-icon-check" @click="handleCheckAll">全选</el-button>
+            <el-button size="mini" icon="el-icon-close" @click="handleClearPermissions">清空</el-button>
+          </div>
+        </div>
+
+        <div class="assignment-tree-shell">
+          <div class="tree-guide" aria-hidden="true">
+            <span>权限分类与明细</span>
+            <span>勾选父节点可选择整类权限</span>
+          </div>
+          <el-tree
+            v-if="permissionTreeData.length"
+            :key="permTreeVersion"
+            ref="permTree"
+            class="assignment-tree"
+            :data="permissionTreeData"
+            node-key="nodeKey"
+            show-checkbox
+            :props="permissionTreeProps"
+            :filter-node-method="filterPermissionNode"
+            :default-expanded-keys="expandedPermissionGroups"
+            @check="handlePermCheckChange"
+          >
+            <span slot-scope="{ data }" class="permission-tree-node" :class="`is-${data.nodeType}`">
+              <template v-if="data.nodeType === 'group'">
+                <span class="group-folder"><i class="el-icon-folder-opened"></i></span>
+                <span class="tree-group-copy">
+                  <span class="tree-group-title">
+                    <strong>{{ data.label }}</strong>
+                    <code>{{ data.controllerName }}</code>
+                  </span>
+                  <span class="tree-group-description">{{ data.description || '该 Controller 下声明的接口权限' }}</span>
+                </span>
+                <span class="tree-group-count">
+                  <b>{{ selectedCountForGroup(data) }}</b> / {{ data.children.length }} 已选
+                </span>
+              </template>
+              <template v-else>
+                <span class="permission-name">
+                  <strong>{{ data.permissionName }}</strong>
+                  <code>{{ data.permissionCode }}</code>
+                </span>
+                <code class="permission-path">{{ data.apiPath }}</code>
+                <span class="permission-status" :class="data.status === 'ACTIVE' ? 'active' : 'inactive'">
+                  <i></i>{{ data.status === 'ACTIVE' ? '启用' : '禁用' }}
+                </span>
+              </template>
+            </span>
+          </el-tree>
+          <el-empty
+            v-else-if="!permLoading"
+            description="暂无可分配权限"
+            :image-size="76"
+          />
+        </div>
       </div>
-      <div slot="footer">
-        <el-button @click="permDialogVisible = false">取 消</el-button>
-        <el-button type="primary" :loading="permSubmitLoading" @click="handleSubmitPermissions">确 定</el-button>
+      <div slot="footer" class="permission-dialog-footer">
+        <span class="change-summary" :class="{ changed: permissionDelta.added || permissionDelta.removed }">
+          <template v-if="permissionDelta.added || permissionDelta.removed">
+            本次新增 {{ permissionDelta.added }} 项，移除 {{ permissionDelta.removed }} 项
+          </template>
+          <template v-else>授权范围未变化</template>
+        </span>
+        <div>
+          <el-button @click="permDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="permSubmitLoading" @click="handleSubmitPermissions">保存授权</el-button>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -144,7 +216,7 @@
 
 <script>
 import { pageRoles, addRole, updateRole, deleteRole, batchDeleteRoles, getRolePermissionIds, assignRolePermissions } from '@/api/role'
-import { listPermissions } from '@/api/permission'
+import { listPermissionTree } from '@/api/permission'
 
 export default {
   name: 'RoleManage',
@@ -193,14 +265,30 @@ export default {
       permLoading: false,
       permSubmitLoading: false,
       currentRole: {},
-      allPermissions: [],
+      permissionTreeData: [],
+      permissionTotal: 0,
       selectedPermIds: [],
-      initPermIds: []
+      initPermIds: [],
+      permKeyword: '',
+      permTreeVersion: 0,
+      expandedPermissionGroups: [],
+      permissionTreeProps: {
+        children: 'children',
+        label: 'label'
+      }
     }
   },
   computed: {
     dialogTitle() {
       return this.isEdit ? '编辑角色' : '新增角色'
+    },
+    permissionDelta() {
+      const initialIds = new Set(this.initPermIds)
+      const selectedIds = new Set(this.selectedPermIds)
+      return {
+        added: this.selectedPermIds.filter(id => !initialIds.has(id)).length,
+        removed: this.initPermIds.filter(id => !selectedIds.has(id)).length
+      }
     }
   },
   created() {
@@ -303,20 +391,41 @@ export default {
       this.permDialogVisible = true
       this.permLoading = true
       this.selectedPermIds = []
+      this.permissionTreeData = []
+      this.permissionTotal = 0
+      this.permKeyword = ''
+      this.expandedPermissionGroups = []
       try {
         const [permRes, rolePermRes] = await Promise.all([
-          listPermissions({}),
+          listPermissionTree({}),
           getRolePermissionIds(row.id)
         ])
-        this.allPermissions = permRes.data || []
+        const groups = (permRes.data && permRes.data.groups) || []
+        this.permissionTreeData = groups.map(group => ({
+          nodeKey: `group:${group.groupCode}`,
+          nodeType: 'group',
+          label: group.groupName,
+          controllerName: group.controllerName,
+          description: group.groupDescription,
+          children: (group.permissions || []).map(permission => ({
+            nodeKey: `permission:${permission.id}`,
+            nodeType: 'permission',
+            permissionId: permission.id,
+            permissionCode: permission.permissionCode,
+            permissionName: permission.permissionName,
+            apiPath: permission.apiPath,
+            status: permission.status,
+            label: `${permission.permissionName} ${permission.permissionCode}`
+          }))
+        }))
+        this.permissionTotal = this.permissionTreeData.reduce((total, group) => total + group.children.length, 0)
         this.initPermIds = rolePermRes.data || []
+        this.selectedPermIds = [...this.initPermIds]
+        this.permTreeVersion += 1
         // 回显已勾选的权限
         this.$nextTick(() => {
-          this.allPermissions.forEach(item => {
-            if (this.initPermIds.includes(item.id)) {
-              this.$refs.permTable.toggleRowSelection(item, true)
-            }
-          })
+          const checkedKeys = this.initPermIds.map(id => `permission:${id}`)
+          this.$refs.permTree && this.$refs.permTree.setCheckedKeys(checkedKeys)
         })
       } catch (e) {
         // 错误已由请求拦截器统一处理
@@ -324,15 +433,53 @@ export default {
         this.permLoading = false
       }
     },
-    handlePermSelectionChange(selection) {
-      this.selectedPermIds = selection.map(item => item.id)
+    handlePermCheckChange(data, checkState) {
+      this.selectedPermIds = checkState.checkedNodes
+        .filter(node => node.nodeType === 'permission')
+        .map(node => node.permissionId)
     },
     handleCheckAll() {
-      this.allPermissions.forEach(item => {
-        this.$refs.permTable.toggleRowSelection(item, true)
-      })
+      const allPermissionKeys = this.permissionTreeData
+        .flatMap(group => group.children)
+        .map(permission => permission.nodeKey)
+      this.$refs.permTree && this.$refs.permTree.setCheckedKeys(allPermissionKeys)
+      this.syncSelectedPermissionIds()
+    },
+    handleClearPermissions() {
+      this.$refs.permTree && this.$refs.permTree.setCheckedKeys([])
+      this.selectedPermIds = []
+    },
+    syncSelectedPermissionIds() {
+      if (!this.$refs.permTree) return
+      this.selectedPermIds = this.$refs.permTree.getCheckedNodes(true, false)
+        .filter(node => node.nodeType === 'permission')
+        .map(node => node.permissionId)
+    },
+    selectedCountForGroup(group) {
+      const selectedIds = new Set(this.selectedPermIds)
+      return group.children.filter(permission => selectedIds.has(permission.permissionId)).length
+    },
+    filterPermissionTree(value) {
+      this.$refs.permTree && this.$refs.permTree.filter(value)
+    },
+    filterPermissionNode(value, data) {
+      if (!value) return true
+      const keyword = value.toLowerCase()
+      const searchableText = data.nodeType === 'group'
+        ? `${data.label} ${data.controllerName} ${data.description || ''}`
+        : `${data.permissionName} ${data.permissionCode} ${data.apiPath}`
+      return searchableText.toLowerCase().includes(keyword)
+    },
+    resetPermissionDialog() {
+      this.permissionTreeData = []
+      this.permissionTotal = 0
+      this.selectedPermIds = []
+      this.initPermIds = []
+      this.permKeyword = ''
+      this.expandedPermissionGroups = []
     },
     async handleSubmitPermissions() {
+      this.syncSelectedPermissionIds()
       this.permSubmitLoading = true
       try {
         await assignRolePermissions(this.currentRole.id, this.selectedPermIds)
@@ -347,3 +494,408 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.permission-assignment {
+  min-height: 300px;
+  color: var(--ink);
+}
+
+.assignment-brief {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #f7f9f5;
+}
+
+.role-key {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--jade-deep);
+  border: 1px solid #bad7ca;
+  border-radius: 9px;
+  background: var(--jade-soft);
+  font-size: 18px;
+}
+
+.role-identity {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 8px;
+}
+
+.role-identity > span {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.role-identity strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.role-identity code {
+  overflow: hidden;
+  color: var(--brass-ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-total {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding-left: 18px;
+  border-left: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.selection-total b {
+  color: var(--jade-deep);
+  font-family: var(--font-mono);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.assignment-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.assignment-tools ::v-deep .el-input {
+  width: 330px;
+}
+
+.batch-actions {
+  display: flex;
+  flex: none;
+}
+
+.assignment-tree-shell {
+  margin: 0 20px 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card);
+}
+
+.tree-guide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+  background: #f7f9f5;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+}
+
+.assignment-tree {
+  max-height: 390px;
+  overflow-y: auto;
+  background: transparent;
+}
+
+.assignment-tree ::v-deep .el-tree-node__content {
+  min-height: 56px;
+  height: auto;
+  padding-right: 14px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--card);
+  transition: background-color .15s ease;
+}
+
+.assignment-tree ::v-deep > .el-tree-node > .el-tree-node__content {
+  min-height: 64px;
+  background: #fbfcfa;
+}
+
+.assignment-tree ::v-deep .el-tree-node__content:hover,
+.assignment-tree ::v-deep .el-tree-node:focus > .el-tree-node__content {
+  background: var(--jade-soft);
+}
+
+.assignment-tree ::v-deep .el-tree-node__children {
+  position: relative;
+  background: #fbfcfa;
+}
+
+.assignment-tree ::v-deep .el-tree-node__children::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 25px;
+  width: 1px;
+  background: #bed7cc;
+  content: '';
+}
+
+.assignment-tree ::v-deep .el-tree-node__expand-icon {
+  color: var(--jade-deep);
+  font-size: 13px;
+}
+
+.assignment-tree ::v-deep .el-tree-node__expand-icon.is-leaf {
+  color: transparent;
+}
+
+.permission-tree-node {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  font-family: var(--font-body);
+}
+
+.permission-tree-node.is-group {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 82px;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-folder {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  color: var(--jade-deep);
+  border-radius: 6px;
+  background: var(--jade-soft);
+  font-size: 14px;
+}
+
+.tree-group-copy,
+.permission-name {
+  min-width: 0;
+}
+
+.tree-group-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+
+.tree-group-title strong {
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.tree-group-title code {
+  overflow: hidden;
+  color: var(--brass-ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-group-description {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ink-3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-group-count {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tree-group-count b {
+  color: var(--jade-deep);
+  font-size: 11px;
+}
+
+.permission-tree-node.is-permission {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.15fr) minmax(210px, 1.35fr) 55px;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.permission-name {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.permission-name strong {
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.permission-name code,
+.permission-path {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-name code {
+  color: var(--jade-deep);
+}
+
+.permission-path {
+  color: var(--ink-2);
+}
+
+.permission-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+
+.permission-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #b9c2b9;
+}
+
+.permission-status.active {
+  color: var(--jade-deep);
+}
+
+.permission-status.active i {
+  background: var(--jade);
+  box-shadow: 0 0 0 3px var(--jade-soft);
+}
+
+.permission-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.change-summary {
+  color: var(--ink-3);
+  font-size: 11px;
+}
+
+.change-summary.changed {
+  color: var(--brass-ink);
+}
+
+.page-container ::v-deep .role-permission-dialog .el-dialog__body {
+  padding: 0;
+}
+
+.page-container ::v-deep .role-permission-dialog .el-dialog__footer {
+  padding: 14px 20px 16px;
+}
+
+@media (max-width: 760px) {
+  .page-container ::v-deep .role-permission-dialog {
+    width: calc(100% - 24px) !important;
+    margin-top: 4vh !important;
+  }
+
+  .assignment-brief {
+    grid-template-columns: 38px minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .role-key {
+    width: 38px;
+    height: 38px;
+  }
+
+  .role-identity {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .selection-total {
+    grid-column: 1 / -1;
+    padding: 10px 0 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .assignment-tools {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 12px 14px;
+  }
+
+  .assignment-tools ::v-deep .el-input {
+    width: 100%;
+  }
+
+  .assignment-tree-shell {
+    margin: 0 14px 14px;
+  }
+
+  .tree-guide span:last-child,
+  .group-folder,
+  .tree-group-description,
+  .tree-group-title code {
+    display: none;
+  }
+
+  .permission-tree-node.is-group {
+    grid-template-columns: minmax(0, 1fr) 62px;
+  }
+
+  .permission-tree-node.is-permission {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+    padding: 9px 0;
+  }
+
+  .permission-path {
+    max-width: 100%;
+  }
+
+  .permission-status {
+    justify-content: flex-start;
+  }
+
+  .permission-dialog-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .permission-dialog-footer > div {
+    display: flex;
+    justify-content: flex-end;
+  }
+}
+</style>
