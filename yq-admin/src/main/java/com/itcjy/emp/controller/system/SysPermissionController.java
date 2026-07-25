@@ -6,13 +6,14 @@ import com.itcjy.common.pojo.ApiResponse;
 import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.pojo.entity.SysPermission;
 import com.itcjy.emp.pojo.req.system.SysPermissionPageReq;
+import com.itcjy.emp.pojo.res.system.SysPermissionTreeRes;
 import com.itcjy.emp.service.system.ISysPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,10 +29,10 @@ import java.util.List;
 @Validated
 @RequestMapping("/emp/sysPermission")
 @Tag(name = "权限查询", description = "系统权限查询接口")
+@RequiredArgsConstructor
 public class SysPermissionController {
 
-    @Resource
-    private ISysPermissionService sysPermissionService;
+    private final ISysPermissionService sysPermissionService;
 
     @Operation(summary = "查询权限列表", description = "查询全部权限，支持权限编码、权限名称、API路径和状态过滤")
     @GetMapping("/list")
@@ -45,6 +46,13 @@ public class SysPermissionController {
     @HasPermission(code = "sys:permission:page", name = "分页查询权限", description = "分页查询系统权限")
     public ApiResponse<PageResult<SysPermission>> pagePermissions(@Valid @ParameterObject SysPermissionPageReq req) {
         return ApiResponse.success(sysPermissionService.pagePermissions(req));
+    }
+
+    @Operation(summary = "查询权限树", description = "按 Controller 分类查询权限，分类名称来自 Controller 的 Tag 注解")
+    @GetMapping("/tree")
+    @HasPermission(code = "sys:permission:tree", name = "查询权限树", description = "按Controller分类查询系统权限")
+    public ApiResponse<SysPermissionTreeRes> listPermissionTree(@Valid @ParameterObject SysPermissionPageReq req) {
+        return ApiResponse.success(sysPermissionService.listPermissionTree(req));
     }
 
     @Operation(summary = "查询权限详情", description = "根据ID查询权限详情")

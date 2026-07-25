@@ -23,6 +23,15 @@ export function pagePermissions(params) {
   })
 }
 
+// 按后端 Controller 分类查询权限树
+export function listPermissionTree(params) {
+  return request({
+    url: '/emp/sysPermission/tree',
+    method: 'get',
+    params
+  })
+}
+
 // 查询权限详情
 export function getPermission(id) {
   return request({
