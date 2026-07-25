@@ -208,6 +208,86 @@
         </el-button>
       </div>
     </el-dialog>
+
+    <el-dialog
+      :visible.sync="previewVisible"
+      width="92%"
+      top="4vh"
+      custom-class="template-preview-dialog"
+      :close-on-click-modal="false"
+      append-to-body
+      @closed="resetPreview"
+    >
+      <div slot="title" class="preview-title">
+        <span class="preview-seal"><i class="el-icon-notebook-2"></i></span>
+        <div>
+          <b>{{ previewData.fileName || (previewTarget && previewTarget.contentFileName) || '作业标准预览' }}</b>
+          <small>
+            {{ previewTarget ? previewTarget.courseName : '' }}
+            <template v-if="previewPosition"> · {{ previewPosition }}</template>
+            <template v-if="previewData.expireSeconds"> · 地址有效 {{ formatExpire(previewData.expireSeconds) }}</template>
+          </small>
+        </div>
+      </div>
+
+      <div class="preview-toolbar">
+        <span><i class="el-icon-lock"></i> 文件通过 OSS 临时地址加载</span>
+        <el-button
+          size="small"
+          icon="el-icon-refresh"
+          :loading="previewLoading"
+          :disabled="!previewTarget"
+          @click="refreshPreview"
+        >刷新地址</el-button>
+      </div>
+
+      <div v-loading="previewLoading" class="preview-stage">
+        <article
+          v-if="previewKind === 'markdown' && previewHtml"
+          class="preview-markdown"
+          v-html="previewHtml"
+        />
+        <pre v-else-if="previewKind === 'text' && previewText" class="preview-text">{{ previewText }}</pre>
+        <img
+          v-else-if="previewData.previewUrl && previewKind === 'image'"
+          :src="previewData.previewUrl"
+          :alt="previewData.fileName || '作业标准预览'"
+          class="preview-image"
+        >
+        <iframe
+          v-else-if="previewData.previewUrl && (previewKind === 'pdf' || previewFallback)"
+          :key="previewData.previewUrl"
+          :src="previewData.previewUrl"
+          :title="`${previewData.fileName || '作业标准'}预览`"
+          class="preview-frame"
+        />
+        <div v-else-if="previewError" class="preview-state is-error">
+          <i class="el-icon-warning-outline"></i>
+          <b>预览加载失败</b>
+          <span>{{ previewError }}</span>
+          <el-button type="text" @click="refreshPreview">重新加载</el-button>
+        </div>
+        <div v-else-if="!previewLoading" class="preview-state">
+          <i class="el-icon-document"></i>
+          <b>该格式无法在浏览器中直接预览</b>
+          <span>可以使用下方“下载原文件”在本地打开。</span>
+        </div>
+      </div>
+
+      <div slot="footer" class="preview-footer">
+        <p><i class="el-icon-info"></i> PDF、图片、Markdown 和文本可在线查看，Office 文档请下载后打开。</p>
+        <div>
+          <el-button @click="previewVisible = false">关闭</el-button>
+          <el-button
+            type="primary"
+            icon="el-icon-download"
+            :loading="previewDownloading"
+            :disabled="!previewTarget"
+            @click="downloadPreviewFile"
+          >下载原文件</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -219,9 +299,11 @@ import {
   createCourseHomeworkTemplate,
   updateCourseHomeworkTemplate,
   deleteCourseHomeworkTemplate,
-  getCourseHomeworkTemplatePreview
+  getCourseHomeworkTemplatePreview,
+  getCourseHomeworkTemplateDownload
 } from '@/api/courseHomeworkTemplate'
 import { uploadToOssWithProgress } from '@/utils/ossUpload'
+import { renderMarkdown } from '@/utils/markdown'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024
 
@@ -250,6 +332,15 @@ export default {
       isEdit: false,
       editId: null,
       selectedFile: null,
+      previewVisible: false,
+      previewLoading: false,
+      previewDownloading: false,
+      previewTarget: null,
+      previewData: {},
+      previewHtml: '',
+      previewText: '',
+      previewFallback: false,
+      previewError: '',
       queryParams: { current: 1, size: 10, courseId: null, status: '' },
       form: emptyForm(),
       rules: {
@@ -279,6 +370,22 @@ export default {
     submitText() {
       if (this.uploadProgress > 0 && this.uploadProgress < 100) return `上传中 ${this.uploadProgress}%`
       return '正在保存'
+    },
+    previewPosition() {
+      if (!this.previewTarget) return ''
+      return this.previewTarget.teachingMode === 'ONLINE'
+        ? this.previewTarget.stageName
+        : `D${this.previewTarget.dayNumber}`
+    },
+    previewKind() {
+      const fileName = this.previewData.fileName ||
+        (this.previewTarget && this.previewTarget.contentFileName) || ''
+      const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : ''
+      if (['md', 'markdown'].includes(extension)) return 'markdown'
+      if (['txt', 'log', 'csv', 'json', 'xml'].includes(extension)) return 'text'
+      if (extension === 'pdf') return 'pdf'
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) return 'image'
+      return 'unsupported'
     }
   },
   created() {
@@ -409,14 +516,66 @@ export default {
       }
     },
     async handlePreview(row) {
-      const previewWindow = window.open('', '_blank')
+      this.previewTarget = row
+      this.previewVisible = true
+      await this.loadPreview(row.id)
+    },
+    async loadPreview(id) {
+      this.previewLoading = true
+      this.previewError = ''
+      this.previewHtml = ''
+      this.previewText = ''
+      this.previewFallback = false
       try {
-        const res = await getCourseHomeworkTemplatePreview(row.id)
-        if (previewWindow) previewWindow.location.href = res.data.previewUrl
-        else window.open(res.data.previewUrl, '_blank')
+        const res = await getCourseHomeworkTemplatePreview(id)
+        this.previewData = res.data || {}
+        if (['markdown', 'text'].includes(this.previewKind)) {
+          try {
+            const response = await fetch(this.previewData.previewUrl)
+            if (!response.ok) throw new Error(`OSS 文件读取失败（HTTP ${response.status}）`)
+            const content = await response.text()
+            if (this.previewKind === 'markdown') this.previewHtml = renderMarkdown(content)
+            else this.previewText = content
+          } catch (error) {
+            // 跨域未放行时仍可借助 inline 预览地址在 iframe 中展示原文。
+            this.previewFallback = true
+          }
+        }
       } catch (error) {
-        if (previewWindow) previewWindow.close()
+        this.previewData = {}
+        this.previewError = error.message || '作业标准预览加载失败'
+      } finally {
+        this.previewLoading = false
       }
+    },
+    refreshPreview() {
+      if (this.previewTarget) this.loadPreview(this.previewTarget.id)
+    },
+    async downloadPreviewFile() {
+      if (!this.previewTarget) return
+      this.previewDownloading = true
+      try {
+        const res = await getCourseHomeworkTemplateDownload(this.previewTarget.id)
+        const link = document.createElement('a')
+        link.href = res.data.downloadUrl
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        this.$message.success('已开始下载原文件')
+      } finally {
+        this.previewDownloading = false
+      }
+    },
+    resetPreview() {
+      this.previewTarget = null
+      this.previewData = {}
+      this.previewHtml = ''
+      this.previewText = ''
+      this.previewFallback = false
+      this.previewError = ''
+      this.previewLoading = false
+      this.previewDownloading = false
     },
     handleDelete(row) {
       const position = row.teachingMode === 'ONLINE' ? row.stageName : `D${row.dayNumber}`
@@ -442,6 +601,11 @@ export default {
       if (size < 1024) return `${size} B`
       if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
       return `${(size / 1024 / 1024).toFixed(1)} MB`
+    },
+    formatExpire(seconds) {
+      if (!seconds) return '一段时间'
+      if (seconds >= 3600) return `${Math.round(seconds / 3600)} 小时`
+      return `${Math.max(1, Math.round(seconds / 60))} 分钟`
     }
   }
 }
@@ -484,11 +648,61 @@ export default {
 .standard-drop span { color: var(--ink-3); font-size: 11px; }
 .standard-drop em { color: var(--jade-deep); font-size: 12px; font-style: normal; font-weight: 600; }
 .upload-progress { margin-top: 8px; }
+.preview-title { display: flex; align-items: center; gap: 12px; padding-right: 42px; }
+.preview-seal { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 7px; color: var(--brass-ink); background: var(--brass-soft); font-size: 17px; }
+.preview-title > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.preview-title b { overflow: hidden; color: var(--ink); font: 700 15px var(--font-display); text-overflow: ellipsis; white-space: nowrap; }
+.preview-title small { overflow: hidden; color: var(--ink-3); font: 10px var(--font-mono); letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
+.preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 8px 13px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: #F7F9F5; }
+.preview-toolbar > span { color: var(--ink-3); font-size: 11px; }
+.preview-toolbar > span i { margin-right: 6px; color: var(--jade); }
+.preview-stage { position: relative; min-height: 66vh; border: 1px solid var(--line); background: #DDE3DC; }
+.preview-frame { display: block; width: 100%; height: 66vh; border: 0; background: #FFF; }
+.preview-image { display: block; max-width: 100%; max-height: 66vh; margin: auto; object-fit: contain; }
+.preview-text { box-sizing: border-box; min-height: 66vh; max-height: 66vh; margin: 0; overflow: auto; padding: 32px 38px; background: #FFF; color: #26342D; font: 13px/1.75 var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+.preview-markdown { box-sizing: border-box; min-height: 66vh; max-height: 66vh; overflow-y: auto; padding: 36px 48px 64px; background: #FFF; color: #26342D; font: 14px/1.78 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
+.preview-markdown h1, .preview-markdown h2, .preview-markdown h3 { margin: 1.5em 0 .65em; color: #14251C; line-height: 1.3; }
+.preview-markdown h1 { margin-top: 0; padding-bottom: .4em; border-bottom: 2px solid #C6D5CC; font-size: 27px; }
+.preview-markdown h2 { padding-bottom: .35em; border-bottom: 1px solid #DEE6E0; font-size: 21px; }
+.preview-markdown h3 { font-size: 17px; }
+.preview-markdown p { margin: .75em 0; }
+.preview-markdown a { color: #116F56; }
+.preview-markdown code { padding: 2px 5px; border-radius: 4px; background: #EEF4F0; color: #A8462F; font: 12px Consolas, monospace; }
+.preview-markdown pre { overflow-x: auto; padding: 16px 18px; border-left: 3px solid #B98A2F; border-radius: 5px; background: #18251F; }
+.preview-markdown pre code { padding: 0; background: transparent; color: #E5ECE7; }
+.preview-markdown blockquote { margin: 1.2em 0; padding: 9px 16px; border-left: 3px solid #2A8469; background: #F1F7F4; color: #52625A; }
+.preview-markdown table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.preview-markdown th, .preview-markdown td { padding: 8px 10px; border: 1px solid #DCE4DE; text-align: left; }
+.preview-markdown th { background: #F1F5F2; }
+.preview-state { min-height: 66vh; display: grid; place-content: center; justify-items: center; padding: 20px; color: var(--ink-3); text-align: center; }
+.preview-state i { margin-bottom: 13px; font-size: 34px; }
+.preview-state b { color: var(--ink-2); font-size: 14px; }
+.preview-state span { max-width: 560px; margin-top: 6px; font-size: 11px; line-height: 1.6; }
+.preview-state.is-error { color: #B45F45; }
+.preview-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.preview-footer p { margin: 0; color: var(--ink-3); font-size: 11px; text-align: left; }
+.preview-footer p i { margin-right: 5px; color: var(--brass-ink); }
 @media (max-width: 900px) {
   .table-toolbar { align-items: flex-start; flex-direction: column; }
   .toolbar-note, .sync-note { display: none; }
   .binding-rail { grid-template-columns: 1fr; gap: 9px; }
   .binding-rail > i { display: none; }
   .form-grid, .compact-grid { grid-template-columns: 1fr; gap: 0; }
+  .preview-footer { align-items: stretch; flex-direction: column; }
+  .preview-footer > div { display: flex; }
+  .preview-footer .el-button { flex: 1; }
+  .preview-markdown { padding: 26px 20px 44px; }
+}
+</style>
+
+<style>
+.template-preview-dialog { max-width: 1280px; border-radius: 10px; }
+.template-preview-dialog .el-dialog__header { padding: 13px 18px; }
+.template-preview-dialog .el-dialog__body { padding: 14px 18px 0; }
+.template-preview-dialog .el-dialog__footer { padding: 12px 18px 14px; }
+@media (max-width: 700px) {
+  .template-preview-dialog { width: calc(100% - 20px) !important; margin-top: 10px !important; }
+  .template-preview-dialog .el-dialog__body { padding: 10px 10px 0; }
+  .template-preview-dialog .el-dialog__footer { padding: 10px; }
 }
 </style>
