@@ -97,6 +97,7 @@ function handleAuthFailure(message) {
 // 响应拦截器：统一处理后端 ApiResponse 结构 { code, message, data }
 service.interceptors.response.use(
   response => {
+    if (response.status === 204) return null
     const res = response.data
     if (res.code !== 200) {
       // 认证失效：清除登录态并跳转登录页

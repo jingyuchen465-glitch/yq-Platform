@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -41,11 +42,12 @@ public class HomeworkSubmissionController {
     }
 
     @GetMapping("/homework-submissions/{submissionId}/download-url")
-    @Operation(summary = "获取学生提交文件的下载预签名地址")
+    @Operation(summary = "获取学生提交文件的预签名地址", description = "preview=true 时浏览器内联展示，false 时强制下载")
     @HasPermission(code = "sys:homework:submission:download", name = "预览学生作业", description = "获取学生提交文件的下载预签名地址")
     public ApiResponse<OssDownloadUrlRes> getDownloadUrl(
-            @PathVariable @Positive(message = "提交ID必须大于0") Long submissionId) {
-        return ApiResponse.success(homeworkSubmissionService.generateDownloadUrl(submissionId));
+            @PathVariable @Positive(message = "提交ID必须大于0") Long submissionId,
+            @RequestParam(defaultValue = "true") boolean preview) {
+        return ApiResponse.success(homeworkSubmissionService.generateDownloadUrl(submissionId, preview));
     }
 
     @PatchMapping("/homework-submissions/{submissionId}/grading")

@@ -22,4 +22,8 @@ public interface IOssService {
      * @return 预签名下载URL
      */
     OssDownloadUrlRes generateDownloadUrl(OssDownloadUrlReq req);
+
+    OssDownloadUrlRes generateDownloadUrl(String objectKey, boolean preview);
+
+    OssDownloadUrlRes generateDownloadUrl(String objectKey, boolean preview, String fileName);
 }

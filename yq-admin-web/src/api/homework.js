@@ -55,10 +55,11 @@ export function pageHomeworkSubmissions(homeworkId, params) {
   })
 }
 
-export function getHomeworkSubmissionDownloadUrl(submissionId) {
+export function getHomeworkSubmissionDownloadUrl(submissionId, preview) {
   return request({
     url: `/emp/homework-submissions/${submissionId}/download-url`,
-    method: 'get'
+    method: 'get',
+    params: { preview }
   })
 }
 

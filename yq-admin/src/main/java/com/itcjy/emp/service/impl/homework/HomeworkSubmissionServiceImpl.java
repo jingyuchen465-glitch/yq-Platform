@@ -18,7 +18,6 @@ import com.itcjy.emp.pojo.entity.SysClass;
 import com.itcjy.emp.pojo.entity.SysUser;
 import com.itcjy.emp.pojo.req.homework.HomeworkSubmissionGradeReq;
 import com.itcjy.emp.pojo.req.homework.HomeworkSubmissionPageReq;
-import com.itcjy.emp.pojo.req.oss.OssDownloadUrlReq;
 import com.itcjy.emp.pojo.res.homework.HomeworkSubmissionItemRes;
 import com.itcjy.emp.pojo.res.homework.HomeworkSubmissionOverviewRes;
 import com.itcjy.emp.pojo.res.oss.OssDownloadUrlRes;
@@ -84,11 +83,10 @@ public class HomeworkSubmissionServiceImpl
 
     @Override
     @Transactional(readOnly = true)
-    public OssDownloadUrlRes generateDownloadUrl(Long submissionId) {
+    public OssDownloadUrlRes generateDownloadUrl(Long submissionId, boolean preview) {
         HomeworkSubmission submission = requireSubmission(submissionId);
-        OssDownloadUrlReq downloadReq = new OssDownloadUrlReq();
-        downloadReq.setObjectKey(submission.getContentObjectKey());
-        return ossService.generateDownloadUrl(downloadReq);
+        return ossService.generateDownloadUrl(submission.getContentObjectKey(), preview,
+                submission.getContentFileName());
     }
 
     @Override

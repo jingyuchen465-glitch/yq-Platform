@@ -125,6 +125,39 @@
               <small>发布时后端会再次读取课表，不使用前端传值</small>
             </div>
 
+            <div class="standard-preview" :class="{ missing: !prefillInfo.homeworkTemplate }">
+              <div class="standard-mark">
+                <i :class="prefillInfo.homeworkTemplate ? 'el-icon-notebook-2' : 'el-icon-warning-outline'"></i>
+              </div>
+              <div class="standard-copy">
+                <span>当天作业标准</span>
+                <template v-if="prefillInfo.homeworkTemplate">
+                  <strong>{{ prefillInfo.homeworkTemplate.fileName }}</strong>
+                  <small>
+                    {{ prefillInfo.homeworkTemplate.stageName || `D${prefillInfo.homeworkTemplate.dayNumber}` }}
+                    · 点击后即时生成 OSS 临时预览地址
+                  </small>
+                </template>
+                <template v-else>
+                  <strong>尚未配置匹配的作业标准</strong>
+                  <small>可继续发布，或先前往“作业标准管理”补充该课程天次的文档</small>
+                </template>
+              </div>
+              <el-button
+                v-if="prefillInfo.homeworkTemplate"
+                type="primary"
+                plain
+                icon="el-icon-view"
+                @click="previewHomeworkTemplate"
+              >预览标准</el-button>
+              <el-button
+                v-else
+                type="text"
+                icon="el-icon-right"
+                @click="$router.push('/homework/templates')"
+              >去配置</el-button>
+            </div>
+
             <div class="time-grid">
               <el-form-item label="开始时间" prop="startTime">
                 <el-date-picker
@@ -221,6 +254,63 @@
         </template>
       </main>
     </section>
+
+    <el-dialog
+      :visible.sync="previewVisible"
+      width="92%"
+      top="4vh"
+      custom-class="standard-viewer-dialog"
+      :close-on-click-modal="false"
+      @closed="resetTemplatePreview"
+    >
+      <div slot="title" class="viewer-title">
+        <span class="viewer-seal"><i class="el-icon-notebook-2"></i></span>
+        <div>
+          <b>{{ templatePreview.fileName || '作业标准预览' }}</b>
+          <small>
+            OSS 临时预览
+            <template v-if="templatePreview.expireSeconds"> · 有效 {{ formatExpire(templatePreview.expireSeconds) }}</template>
+          </small>
+        </div>
+      </div>
+
+      <div class="viewer-toolbar">
+        <span><i class="el-icon-lock"></i> 文件通过阿里云 OSS 预签名地址加载，不经过应用服务器</span>
+        <div>
+          <el-button size="small" icon="el-icon-refresh" :loading="previewLoading" @click="refreshTemplatePreview">刷新地址</el-button>
+          <el-button size="small" icon="el-icon-top-right" :disabled="!templatePreview.previewUrl || templatePreviewKind === 'unsupported'" @click="openTemplatePreviewWindow">新窗口打开</el-button>
+        </div>
+      </div>
+
+      <div v-loading="previewLoading" class="viewer-stage">
+        <article
+          v-if="templatePreviewKind === 'markdown' && templatePreviewHtml"
+          class="viewer-markdown markdown-body"
+          v-html="templatePreviewHtml"
+        />
+        <pre v-else-if="templatePreviewKind === 'text' && templatePreviewText" class="viewer-text">{{ templatePreviewText }}</pre>
+        <iframe
+          v-else-if="templatePreview.previewUrl && (templatePreviewKind === 'frame' || templatePreviewFallback)"
+          :key="templatePreview.previewUrl"
+          :src="templatePreview.previewUrl"
+          :title="`${templatePreview.fileName || '作业标准'}预览`"
+          class="viewer-frame"
+        />
+        <div v-else-if="!previewLoading" class="viewer-empty">
+          <i :class="templatePreviewKind === 'unsupported' ? 'el-icon-document' : 'el-icon-document-delete'"></i>
+          <b>{{ templatePreviewKind === 'unsupported' ? '该格式不支持浏览器内预览' : '预览内容未能加载' }}</b>
+          <span>{{ templatePreviewKind === 'unsupported' ? '请使用下方“下载原文件”按钮查看，预览操作不会自动下载。' : '请刷新临时地址后重试。' }}</span>
+        </div>
+      </div>
+
+      <div slot="footer" class="viewer-footer">
+        <p><i class="el-icon-info"></i> 部分 Office 文档取决于浏览器支持；无法在线显示时请下载查看。</p>
+        <div>
+          <el-button @click="previewVisible = false">关闭</el-button>
+          <el-button type="primary" icon="el-icon-download" :loading="templateDownloading" @click="downloadHomeworkTemplate">下载原文件</el-button>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -231,6 +321,11 @@ import {
   publishHomework
 } from '@/api/homework'
 import { uploadToOssWithProgress } from '@/utils/ossUpload'
+import {
+  getCourseHomeworkTemplatePreview,
+  getCourseHomeworkTemplateDownload
+} from '@/api/courseHomeworkTemplate'
+import { renderMarkdown } from '@/utils/markdown'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -275,6 +370,13 @@ export default {
       draft: createDraft(),
       selectedFile: null,
       uploadedObjectKey: '',
+      previewVisible: false,
+      previewLoading: false,
+      templateDownloading: false,
+      templatePreview: {},
+      templatePreviewHtml: '',
+      templatePreviewText: '',
+      templatePreviewFallback: false,
       rules: {
         title: [
           { required: true, message: '请输入作业标题', trigger: 'blur' },
@@ -295,6 +397,15 @@ export default {
       if (this.publishingStage === 2) return `正在上传 ${this.uploadProgress}%`
       if (this.publishingStage === 3) return '正在发布'
       return '正在校验'
+    },
+    templatePreviewKind() {
+      const fileName = this.templatePreview.fileName ||
+        (this.prefillInfo.homeworkTemplate && this.prefillInfo.homeworkTemplate.fileName) || ''
+      const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : ''
+      if (['md', 'markdown'].includes(extension)) return 'markdown'
+      if (['txt', 'log', 'csv', 'json', 'xml'].includes(extension)) return 'text'
+      if (['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(extension)) return 'frame'
+      return 'unsupported'
     }
   },
   watch: {
@@ -344,6 +455,7 @@ export default {
     },
     invalidateDraft() {
       if (this.prefillLoading) return
+      this.previewVisible = false
       this.prefillReady = false
       this.prefillInfo = {}
       this.draft = createDraft()
@@ -387,6 +499,87 @@ export default {
       if (size < 1024) return `${size} B`
       if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
       return `${(size / 1024 / 1024).toFixed(1)} MB`
+    },
+    formatExpire(seconds) {
+      if (!seconds) return '一段时间'
+      if (seconds >= 3600) return `${Math.round(seconds / 3600)} 小时`
+      return `${Math.max(1, Math.round(seconds / 60))} 分钟`
+    },
+    async previewHomeworkTemplate() {
+      const template = this.prefillInfo.homeworkTemplate
+      if (!template || !template.templateId) return
+      this.previewVisible = true
+      await this.loadTemplatePreview(template.templateId)
+    },
+    async loadTemplatePreview(templateId) {
+      this.previewLoading = true
+      this.templatePreviewHtml = ''
+      this.templatePreviewText = ''
+      this.templatePreviewFallback = false
+      try {
+        const res = await getCourseHomeworkTemplatePreview(templateId)
+        this.templatePreview = res.data || {}
+        if (['markdown', 'text'].includes(this.templatePreviewKind)) {
+          try {
+            const fileResponse = await fetch(this.templatePreview.previewUrl)
+            if (!fileResponse.ok) throw new Error(`OSS预览加载失败: ${fileResponse.status}`)
+            const content = await fileResponse.text()
+            if (this.templatePreviewKind === 'markdown') {
+              this.templatePreviewHtml = renderMarkdown(content)
+            } else {
+              this.templatePreviewText = content
+            }
+          } catch (error) {
+            // OSS 未开放跨域读取时退回 iframe，文件类型由上传时的 Content-Type 决定。
+            this.templatePreviewFallback = true
+            this.$message.warning('无法渲染文档样式，已切换为原文预览')
+          }
+        }
+      } catch (error) {
+        this.templatePreviewHtml = ''
+        this.templatePreviewText = ''
+        this.$message.error(error.message || '作业标准预览加载失败')
+      } finally {
+        this.previewLoading = false
+      }
+    },
+    refreshTemplatePreview() {
+      const template = this.prefillInfo.homeworkTemplate
+      if (template && template.templateId) this.loadTemplatePreview(template.templateId)
+    },
+    openTemplatePreviewWindow() {
+      if (this.templatePreview.previewUrl && this.templatePreviewKind !== 'unsupported') {
+        window.open(this.templatePreview.previewUrl, '_blank', 'noopener,noreferrer')
+      } else {
+        this.$message.warning('该格式不支持浏览器直接打开，请使用“下载原文件”')
+      }
+    },
+    async downloadHomeworkTemplate() {
+      const template = this.prefillInfo.homeworkTemplate
+      if (!template || !template.templateId) return
+      const downloadWindow = window.open('', '_blank')
+      this.templateDownloading = true
+      try {
+        const res = await getCourseHomeworkTemplateDownload(template.templateId)
+        if (downloadWindow) {
+          downloadWindow.location.href = res.data.downloadUrl
+        } else {
+          window.location.assign(res.data.downloadUrl)
+        }
+      } catch (error) {
+        if (downloadWindow) downloadWindow.close()
+        throw error
+      } finally {
+        this.templateDownloading = false
+      }
+    },
+    resetTemplatePreview() {
+      this.templatePreview = {}
+      this.templatePreviewHtml = ''
+      this.templatePreviewText = ''
+      this.templatePreviewFallback = false
+      this.previewLoading = false
+      this.templateDownloading = false
     },
     validateForm() {
       return new Promise(resolve => {
@@ -438,6 +631,7 @@ export default {
       }
     },
     resetWorkflow() {
+      this.previewVisible = false
       this.query.classId = null
       this.query.homeworkDate = formatToday()
       this.prefillReady = false
@@ -536,6 +730,31 @@ export default {
 .course-strip span,
 .course-strip small { display: block; color: var(--ink-3); font-size: 11px; }
 .course-strip strong { display: block; margin: 6px 0; color: var(--ink); font-size: 15px; line-height: 1.55; }
+.standard-preview { display: flex; align-items: center; gap: 13px; margin: -10px 0 22px; padding: 14px 16px; border: 1px solid #D7C49A; border-radius: 8px; background: #FFFCF5; }
+.standard-preview.missing { border-color: var(--line); background: #F7F9F5; }
+.standard-mark { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 7px; color: var(--brass-ink); background: var(--brass-soft); font-size: 18px; }
+.standard-preview.missing .standard-mark { color: var(--ink-3); background: #E9EDE7; }
+.standard-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.standard-copy span { color: var(--ink-3); font-size: 10px; letter-spacing: .08em; }
+.standard-copy strong { overflow: hidden; color: var(--ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.standard-copy small { color: var(--ink-3); font-size: 11px; }
+.viewer-title { display: flex; align-items: center; gap: 12px; padding-right: 42px; }
+.viewer-seal { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 7px; color: var(--brass-ink); background: var(--brass-soft); font-size: 17px; }
+.viewer-title > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.viewer-title b { overflow: hidden; color: var(--ink); font: 700 15px var(--font-display); text-overflow: ellipsis; white-space: nowrap; }
+.viewer-title small { color: var(--ink-3); font: 10px var(--font-mono); letter-spacing: .05em; }
+.viewer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 8px 13px; border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0; background: #F7F9F5; }
+.viewer-toolbar > span { color: var(--ink-3); font-size: 11px; }
+.viewer-toolbar > span i { margin-right: 6px; color: var(--jade); }
+.viewer-stage { min-height: 68vh; border: 1px solid var(--line); background: #DDE3DC; }
+.viewer-frame { display: block; width: 100%; height: 68vh; border: 0; background: #FFF; }
+.viewer-empty { min-height: 68vh; display: grid; place-content: center; justify-items: center; color: var(--ink-3); text-align: center; }
+.viewer-empty i { margin-bottom: 13px; font-size: 34px; }
+.viewer-empty b { color: var(--ink-2); font-size: 14px; }
+.viewer-empty span { margin-top: 6px; font-size: 11px; }
+.viewer-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.viewer-footer p { color: var(--ink-3); font-size: 11px; text-align: left; }
+.viewer-footer p i { margin-right: 5px; color: var(--brass-ink); }
 .time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .file-drop {
   display: grid;
@@ -589,5 +808,20 @@ export default {
   .time-grid { grid-template-columns: 1fr; gap: 0; }
   .publish-footer { align-items: stretch; flex-direction: column; }
   .publish-sequence { justify-content: center; }
+  .viewer-toolbar, .viewer-footer { align-items: stretch; flex-direction: column; }
+  .viewer-toolbar > div, .viewer-footer > div { display: flex; }
+  .viewer-toolbar .el-button, .viewer-footer .el-button { flex: 1; }
+}
+</style>
+
+<style>
+.standard-viewer-dialog { max-width: 1500px; border-radius: 10px; }
+.standard-viewer-dialog .el-dialog__header { padding: 13px 18px; }
+.standard-viewer-dialog .el-dialog__body { padding: 14px 18px 0; }
+.standard-viewer-dialog .el-dialog__footer { padding: 12px 18px 14px; }
+@media (max-width: 700px) {
+  .standard-viewer-dialog { width: calc(100% - 20px) !important; margin-top: 10px !important; }
+  .standard-viewer-dialog .el-dialog__body { padding: 10px 10px 0; }
+  .standard-viewer-dialog .el-dialog__footer { padding: 10px; }
 }
 </style>

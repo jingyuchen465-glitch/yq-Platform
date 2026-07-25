@@ -1,5 +1,25 @@
 import { getUploadUrl, getDownloadUrl } from '@/api/oss'
 
+const MIME_BY_EXTENSION = {
+  md: 'text/markdown; charset=UTF-8',
+  markdown: 'text/markdown; charset=UTF-8',
+  txt: 'text/plain; charset=UTF-8',
+  json: 'application/json; charset=UTF-8',
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml'
+}
+
+function resolveContentType(file) {
+  if (file.type) return file.type
+  const extension = (file.name.split('.').pop() || '').toLowerCase()
+  return MIME_BY_EXTENSION[extension] || 'application/octet-stream'
+}
+
 /**
  * OSS 直传工具
  * 注意：直传 OSS 的请求不能走 request.js 拦截器（会附加签名头导致 OSS 拒绝），
@@ -15,10 +35,11 @@ import { getUploadUrl, getDownloadUrl } from '@/api/oss'
  * @returns {Promise<{objectKey: string, uploadUrl: string}>} 上传成功返回 objectKey
  */
 export async function uploadToOss(file, bizType, options = {}) {
+  const contentType = resolveContentType(file)
   // 1. 调用后端获取预签名上传 URL
   const res = await getUploadUrl({
     fileName: file.name,
-    contentType: file.type || 'application/octet-stream',
+    contentType,
     bizType
   })
 
@@ -28,7 +49,7 @@ export async function uploadToOss(file, bizType, options = {}) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
-      'Content-Type': file.type || 'application/octet-stream'
+      'Content-Type': contentType
     },
     body: file
   })
@@ -50,10 +71,11 @@ export async function uploadToOss(file, bizType, options = {}) {
 export function uploadToOssWithProgress(file, bizType, onProgress) {
   return new Promise(async (resolve, reject) => {
     try {
+      const contentType = resolveContentType(file)
       // 1. 获取预签名 URL
       const res = await getUploadUrl({
         fileName: file.name,
-        contentType: file.type || 'application/octet-stream',
+        contentType,
         bizType
       })
 
@@ -62,7 +84,7 @@ export function uploadToOssWithProgress(file, bizType, onProgress) {
       // 2. 使用 XMLHttpRequest 上传以支持进度监听
       const xhr = new XMLHttpRequest()
       xhr.open('PUT', uploadUrl, true)
-      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+      xhr.setRequestHeader('Content-Type', contentType)
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable && onProgress) {

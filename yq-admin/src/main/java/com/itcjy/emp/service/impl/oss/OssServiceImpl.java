@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
@@ -56,27 +58,55 @@ public class OssServiceImpl implements IOssService {
 
     @Override
     public OssDownloadUrlRes generateDownloadUrl(OssDownloadUrlReq req) {
+        return generateDownloadUrl(req.getObjectKey(), Boolean.TRUE.equals(req.getPreview()));
+    }
+
+    @Override
+    public OssDownloadUrlRes generateDownloadUrl(String objectKey, boolean preview) {
+        return generateDownloadUrl(objectKey, preview, extractFileName(objectKey));
+    }
+
+    @Override
+    public OssDownloadUrlRes generateDownloadUrl(String objectKey, boolean preview, String fileName) {
         Date expiration = new Date(System.currentTimeMillis() + ossProperties.getDownloadExpireSeconds() * 1000L);
 
         GeneratePresignedUrlRequest request = new GeneratePresignedUrlRequest(
-                ossProperties.getBucketName(), req.getObjectKey(), HttpMethod.GET);
+                ossProperties.getBucketName(), objectKey, HttpMethod.GET);
         request.setExpiration(expiration);
 
         // 根据 preview 参数设置 Content-Disposition 响应头
         ResponseHeaderOverrides headers = new ResponseHeaderOverrides();
-        if (Boolean.TRUE.equals(req.getPreview())) {
-            headers.setContentDisposition("inline");
-        } else {
-            String fileName = extractFileName(req.getObjectKey());
-            headers.setContentDisposition("attachment; filename=\"" + fileName + "\"");
-        }
+        String safeFileName = sanitizeFileName(fileName, objectKey);
+        headers.setContentDisposition(buildContentDisposition(preview, safeFileName));
         request.setResponseHeaders(headers);
 
         URL url = ossClient.generatePresignedUrl(request);
         log.info("生成预签名下载URL, objectKey={}, preview={}, expireSeconds={}",
-                req.getObjectKey(), req.getPreview(), ossProperties.getDownloadExpireSeconds());
+                objectKey, preview, ossProperties.getDownloadExpireSeconds());
 
         return new OssDownloadUrlRes(url.toString(), ossProperties.getDownloadExpireSeconds());
+    }
+
+    private String sanitizeFileName(String fileName, String objectKey) {
+        String resolved = fileName == null || fileName.isBlank() ? extractFileName(objectKey) : fileName.trim();
+        return resolved.replace("\r", "").replace("\n", "");
+    }
+
+    /**
+     * 构建 OSS 兼容的 Content-Disposition 值。
+     * 阿里云 OSS 不接受 Spring ContentDisposition 生成的 RFC 2047 编码（=?UTF-8?Q?...?=），
+     * 需使用 RFC 6266 格式：filename="ascii-fallback"; filename*=UTF-8''percent-encoded
+     */
+    private String buildContentDisposition(boolean preview, String fileName) {
+        String type = preview ? "inline" : "attachment";
+        boolean asciiOnly = fileName.chars().allMatch(c -> c >= 0x20 && c <= 0x7E && c != '"' && c != '\\');
+        if (asciiOnly) {
+            return type + "; filename=\"" + fileName + "\"";
+        }
+        // 非 ASCII 文件名：提供 ASCII 回退 + RFC 5987 编码
+        String asciiFallback = fileName.replaceAll("[^\\x20-\\x7E]", "_").replace("\"", "_");
+        String encoded = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        return type + "; filename=\"" + asciiFallback + "\"; filename*=UTF-8''" + encoded;
     }
 
     /**

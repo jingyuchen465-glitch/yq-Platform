@@ -281,7 +281,8 @@
         <el-button
           size="mini"
           icon="el-icon-download"
-          :disabled="!answerPreviewBlob"
+          :loading="answerDownloading"
+          :disabled="answerPreviewLoading || !answerPreviewTarget"
           @click="downloadPreviewedAnswer"
         >
           下载原文件
@@ -363,8 +364,8 @@ export default {
       answerPreviewError: '',
       answerPreviewType: '',
       answerPreviewHtml: '',
-      answerPreviewBlob: null,
-      answerPreviewObjectUrl: ''
+      answerPreviewObjectUrl: '',
+      answerDownloading: false
     }
   },
   computed: {
@@ -535,7 +536,6 @@ export default {
         const response = await fetch(url)
         if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`)
         const blob = await response.blob()
-        this.answerPreviewBlob = blob
         const fileName = this.answerPreviewTarget.answerFileName || ''
         if (/\.pdf$/i.test(fileName)) {
           this.answerPreviewType = 'pdf'
@@ -547,24 +547,27 @@ export default {
           this.answerPreviewType = 'unsupported'
         }
       } catch (error) {
-        this.answerPreviewBlob = null
         this.answerPreviewError = error.message || '无法读取标准答案，请检查 OSS 跨域配置后重试'
       } finally {
         this.answerPreviewLoading = false
       }
     },
-    downloadPreviewedAnswer() {
-      if (!this.answerPreviewBlob || !this.answerPreviewTarget) return
-      const objectUrl = URL.createObjectURL(this.answerPreviewBlob)
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = this.answerPreviewTarget.answerFileName || 'homework-answer'
-      link.style.display = 'none'
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-      this.$message.success('已开始下载原文件')
+    async downloadPreviewedAnswer() {
+      if (!this.answerPreviewTarget) return
+      this.answerDownloading = true
+      try {
+        const url = await getOssDownloadUrl(this.answerPreviewTarget.answerObjectKey, false)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = this.answerPreviewTarget.answerFileName || 'homework-answer'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        this.$message.success('已开始下载原文件')
+      } finally {
+        this.answerDownloading = false
+      }
     },
     revokeAnswerPreviewUrl() {
       if (this.answerPreviewObjectUrl) {
@@ -578,7 +581,7 @@ export default {
       this.answerPreviewError = ''
       this.answerPreviewType = ''
       this.answerPreviewHtml = ''
-      this.answerPreviewBlob = null
+      this.answerDownloading = false
     },
     replaceHomeworkItem(updatedHomework) {
       const classRow = this.records.find(row => {

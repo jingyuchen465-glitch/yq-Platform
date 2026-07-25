@@ -27,6 +27,7 @@ import com.itcjy.emp.pojo.res.homework.HomeworkPrefillRes;
 import com.itcjy.emp.pojo.res.homework.HomeworkPublishRes;
 import com.itcjy.emp.pojo.res.homework.HomeworkStatusItemRes;
 import com.itcjy.emp.service.homework.IHomeworkService;
+import com.itcjy.emp.service.homework.ICourseHomeworkTemplateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,7 @@ public class HomeworkServiceImpl extends ServiceImpl<HomeworkMapper, Homework> i
 
     private final SysClassMapper sysClassMapper;
     private final SysClassScheduleMapper sysClassScheduleMapper;
+    private final ICourseHomeworkTemplateService courseHomeworkTemplateService;
 
     /**
      * 列出可选的班级
@@ -80,7 +82,9 @@ public class HomeworkServiceImpl extends ServiceImpl<HomeworkMapper, Homework> i
                 buildDefaultTitle(context.sysClass(), homeworkDate),
                 context.schedule().getCourseContent(),
                 homeworkDate.atStartOfDay(),
-                LocalDateTime.of(homeworkDate, LocalTime.of(23, 59, 59))
+                LocalDateTime.of(homeworkDate, LocalTime.of(23, 59, 59)),
+                courseHomeworkTemplateService.findActiveByCourseDetail(
+                        context.schedule().getCourseDetailId())
         );
     }
 

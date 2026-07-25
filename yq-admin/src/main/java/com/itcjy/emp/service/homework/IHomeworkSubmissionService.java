@@ -12,7 +12,7 @@ public interface IHomeworkSubmissionService extends IService<HomeworkSubmission>
 
     HomeworkSubmissionOverviewRes pageByHomework(Long homeworkId, HomeworkSubmissionPageReq req);
 
-    OssDownloadUrlRes generateDownloadUrl(Long submissionId);
+    OssDownloadUrlRes generateDownloadUrl(Long submissionId, boolean preview);
 
     HomeworkSubmissionItemRes grade(Long submissionId, HomeworkSubmissionGradeReq req);
 }

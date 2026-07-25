@@ -141,7 +141,8 @@ export default {
           icon: 'el-icon-edit-outline',
           children: [
             { path: '/homework', title: '作业发布台', icon: 'el-icon-s-promotion' },
-            { path: '/homework/status', title: '作业详情管理', icon: 'el-icon-data-analysis' }
+            { path: '/homework/status', title: '作业详情管理', icon: 'el-icon-data-analysis' },
+            { path: '/homework/templates', title: '作业标准管理', icon: 'el-icon-notebook-2' }
           ]
         },
         { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },

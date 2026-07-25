@@ -90,6 +90,12 @@ const routes = [
         meta: { title: '作业详情管理', icon: 'el-icon-data-analysis' }
       },
       {
+        path: 'homework/templates',
+        name: 'CourseHomeworkTemplateManage',
+        component: () => import('@/views/homework/CourseHomeworkTemplateManage.vue'),
+        meta: { title: '作业标准管理', icon: 'el-icon-notebook-2' }
+      },
+      {
         path: 'homework/:homeworkId/submissions',
         name: 'HomeworkSubmissionManage',
         component: () => import('@/views/homework/HomeworkSubmissionManage.vue'),

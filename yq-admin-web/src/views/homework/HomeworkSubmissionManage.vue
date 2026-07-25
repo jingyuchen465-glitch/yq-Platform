@@ -171,7 +171,6 @@
               size="mini"
               icon="el-icon-download"
               :loading="downloading"
-              :disabled="previewLoading || Boolean(previewError)"
               @click="downloadSubmission"
             >
               下载原文件
@@ -264,7 +263,6 @@ export default {
       previewLoading: false,
       previewError: '',
       markdownHtml: '',
-      submissionBlob: null,
       downloading: false,
       saving: false,
       gradeForm: {
@@ -342,7 +340,6 @@ export default {
         teacherRemark: submission.teacherRemark || ''
       }
       this.markdownHtml = ''
-      this.submissionBlob = null
       this.previewError = ''
       this.drawerVisible = true
       this.$nextTick(() => this.$refs.gradeForm && this.$refs.gradeForm.clearValidate())
@@ -353,37 +350,32 @@ export default {
       this.previewLoading = true
       this.previewError = ''
       try {
-        const urlRes = await getHomeworkSubmissionDownloadUrl(this.activeSubmission.id)
-        // fetch 只读取响应，不导航到 OSS 地址，因此 Content-Disposition: attachment
-        // 也不会触发浏览器下载；下载由页面内的专用按钮显式执行。
+        const urlRes = await getHomeworkSubmissionDownloadUrl(this.activeSubmission.id, true)
+        // 预览必须显式传 true，让 OSS 返回 inline 而不是 attachment。
         const response = await fetch(urlRes.data.downloadUrl)
         if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`)
         const fileBlob = await response.blob()
         const markdownText = await fileBlob.text()
-        this.submissionBlob = fileBlob
         this.markdownHtml = renderMarkdown(markdownText)
       } catch (error) {
-        this.submissionBlob = null
         this.previewError = error.message || '无法读取学生提交文件，请检查 OSS 跨域配置后重试'
       } finally {
         this.previewLoading = false
       }
     },
-    downloadSubmission() {
-      if (!this.submissionBlob || !this.activeSubmission) return
+    async downloadSubmission() {
+      if (!this.activeSubmission) return
       this.downloading = true
-      const objectUrl = URL.createObjectURL(this.submissionBlob)
       try {
+        const urlRes = await getHomeworkSubmissionDownloadUrl(this.activeSubmission.id, false)
         const link = document.createElement('a')
-        link.href = objectUrl
-        link.download = this.activeSubmission.contentFileName || 'homework-submission.md'
+        link.href = urlRes.data.downloadUrl
         link.style.display = 'none'
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
         this.$message.success('已开始下载原文件')
       } finally {
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
         this.downloading = false
       }
     },
