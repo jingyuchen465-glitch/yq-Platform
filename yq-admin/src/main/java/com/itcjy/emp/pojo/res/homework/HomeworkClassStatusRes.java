@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
-@Schema(description = "班级作业发布情况")
+@Schema(description = "班级作业详情")
 public record HomeworkClassStatusRes(
         @Schema(description = "班级ID") Long classId,
         @Schema(description = "班级名称") String className,

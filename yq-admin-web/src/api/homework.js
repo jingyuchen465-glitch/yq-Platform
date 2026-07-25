@@ -46,3 +46,26 @@ export function updateHomeworkAnswerVisibility(homeworkId, data) {
     data
   })
 }
+
+export function pageHomeworkSubmissions(homeworkId, params) {
+  return request({
+    url: `/emp/homeworks/${homeworkId}/submissions`,
+    method: 'get',
+    params
+  })
+}
+
+export function getHomeworkSubmissionDownloadUrl(submissionId) {
+  return request({
+    url: `/emp/homework-submissions/${submissionId}/download-url`,
+    method: 'get'
+  })
+}
+
+export function gradeHomeworkSubmission(submissionId, data) {
+  return request({
+    url: `/emp/homework-submissions/${submissionId}/grading`,
+    method: 'patch',
+    data
+  })
+}

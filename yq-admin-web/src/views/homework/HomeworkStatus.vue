@@ -3,8 +3,8 @@
     <header class="page-head status-head">
       <div>
         <p class="eyebrow">ACADEMIC · HOMEWORK LEDGER</p>
-        <h1>作业发布情况</h1>
-        <p class="head-copy">按日期核对各班作业，并维护标准答案及学生可见范围。</p>
+        <h1>作业详情管理</h1>
+        <p class="head-copy">按日期查找班级作业，维护标准答案，并进入学生提交批改台。</p>
       </div>
       <div class="date-stamp">
         <span>{{ dateTypeLabel }}</span>
@@ -41,7 +41,7 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" icon="el-icon-search" :loading="loading" @click="handleSearch">
-            查询发布情况
+            查询作业
           </el-button>
         </el-form-item>
       </el-form>
@@ -50,7 +50,7 @@
     <section v-if="accessDenied" class="table-card request-state permission-state">
       <i class="el-icon-lock"></i>
       <h2>暂无访问权限</h2>
-      <p>你的账号暂时不能查看作业发布情况，如有需要请联系管理员开通相应权限。</p>
+      <p>你的账号暂时不能查看作业详情，如有需要请联系管理员开通相应权限。</p>
       <el-button icon="el-icon-back" @click="$router.back()">返回上一页</el-button>
     </section>
 
@@ -141,6 +141,14 @@
                     <b>{{ homework.answerFileName || '尚未上传' }}</b>
                   </div>
                   <div class="answer-actions">
+                    <el-button
+                      type="primary"
+                      size="mini"
+                      icon="el-icon-edit-outline"
+                      @click="manageSubmissions(homework, scope.row)"
+                    >
+                      批改提交
+                    </el-button>
                     <el-button
                       size="mini"
                       :icon="homework.answerObjectKey ? 'el-icon-refresh' : 'el-icon-upload2'"
@@ -255,6 +263,57 @@
         </el-button>
       </span>
     </el-dialog>
+
+    <el-dialog
+      :title="answerPreviewTitle"
+      :visible.sync="answerPreviewVisible"
+      width="min(900px, 92vw)"
+      top="5vh"
+      append-to-body
+      custom-class="answer-preview-dialog"
+      @closed="resetAnswerPreview"
+    >
+      <div class="answer-preview-toolbar">
+        <div>
+          <span>标准答案原文件</span>
+          <b>{{ answerPreviewTarget ? answerPreviewTarget.answerFileName : '' }}</b>
+        </div>
+        <el-button
+          size="mini"
+          icon="el-icon-download"
+          :disabled="!answerPreviewBlob"
+          @click="downloadPreviewedAnswer"
+        >
+          下载原文件
+        </el-button>
+      </div>
+
+      <div v-if="answerPreviewLoading" class="answer-preview-state">
+        <i class="el-icon-loading"></i>
+        <span>正在读取文件内容</span>
+      </div>
+      <div v-else-if="answerPreviewError" class="answer-preview-state is-error">
+        <i class="el-icon-warning-outline"></i>
+        <span>{{ answerPreviewError }}</span>
+        <el-button type="text" @click="loadAnswerPreview">重新读取</el-button>
+      </div>
+      <iframe
+        v-else-if="answerPreviewType === 'pdf'"
+        :src="answerPreviewObjectUrl"
+        class="answer-pdf-frame"
+        title="标准答案 PDF 预览"
+      />
+      <article
+        v-else-if="answerPreviewType === 'markdown'"
+        class="answer-preview-markdown"
+        v-html="answerPreviewHtml"
+      ></article>
+      <div v-else class="answer-preview-state is-unsupported">
+        <i class="el-icon-document"></i>
+        <b>此文件格式不能在浏览器中直接预览</b>
+        <span>可以使用上方“下载原文件”按钮在本地打开。</span>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -264,7 +323,8 @@ import {
   saveHomeworkAnswer,
   updateHomeworkAnswerVisibility
 } from '@/api/homework'
-import { previewOssFile, uploadToOssWithProgress } from '@/utils/ossUpload'
+import { getOssDownloadUrl, uploadToOssWithProgress } from '@/utils/ossUpload'
+import { renderMarkdown } from '@/utils/markdown'
 
 const MAX_ANSWER_SIZE = 20 * 1024 * 1024
 const ANSWER_FILE_PATTERN = /\.(md|markdown|pdf|doc|docx|txt)$/i
@@ -296,7 +356,15 @@ export default {
       answerTarget: null,
       answerFile: null,
       answerUploading: false,
-      answerUploadProgress: 0
+      answerUploadProgress: 0,
+      answerPreviewVisible: false,
+      answerPreviewTarget: null,
+      answerPreviewLoading: false,
+      answerPreviewError: '',
+      answerPreviewType: '',
+      answerPreviewHtml: '',
+      answerPreviewBlob: null,
+      answerPreviewObjectUrl: ''
     }
   },
   computed: {
@@ -324,6 +392,11 @@ export default {
       return this.records.reduce((total, item) => {
         return total + item.homeworks.filter(homework => homework.answerObjectKey).length
       }, 0)
+    },
+    answerPreviewTitle() {
+      return this.answerPreviewTarget
+        ? `查看标准答案 · ${this.answerPreviewTarget.title}`
+        : '查看标准答案'
     }
   },
   created() {
@@ -373,6 +446,13 @@ export default {
       if (size < 1024) return `${size} B`
       if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
       return `${(size / 1024 / 1024).toFixed(1)} MB`
+    },
+    manageSubmissions(homework, classRow) {
+      this.$router.push({
+        name: 'HomeworkSubmissionManage',
+        params: { homeworkId: homework.id },
+        query: { className: classRow.className }
+      })
     },
     openAnswerDialog(homework) {
       this.answerTarget = homework
@@ -438,8 +518,67 @@ export default {
         this.$delete(this.visibilityUpdating, homework.id)
       }
     },
-    previewAnswer(homework) {
-      previewOssFile(homework.answerObjectKey)
+    async previewAnswer(homework) {
+      this.answerPreviewTarget = homework
+      this.answerPreviewVisible = true
+      await this.loadAnswerPreview()
+    },
+    async loadAnswerPreview() {
+      if (!this.answerPreviewTarget) return
+      this.answerPreviewLoading = true
+      this.answerPreviewError = ''
+      this.answerPreviewType = ''
+      this.answerPreviewHtml = ''
+      this.revokeAnswerPreviewUrl()
+      try {
+        const url = await getOssDownloadUrl(this.answerPreviewTarget.answerObjectKey)
+        const response = await fetch(url)
+        if (!response.ok) throw new Error(`文件读取失败（HTTP ${response.status}）`)
+        const blob = await response.blob()
+        this.answerPreviewBlob = blob
+        const fileName = this.answerPreviewTarget.answerFileName || ''
+        if (/\.pdf$/i.test(fileName)) {
+          this.answerPreviewType = 'pdf'
+          this.answerPreviewObjectUrl = URL.createObjectURL(blob)
+        } else if (/\.(md|markdown|txt)$/i.test(fileName)) {
+          this.answerPreviewType = 'markdown'
+          this.answerPreviewHtml = renderMarkdown(await blob.text())
+        } else {
+          this.answerPreviewType = 'unsupported'
+        }
+      } catch (error) {
+        this.answerPreviewBlob = null
+        this.answerPreviewError = error.message || '无法读取标准答案，请检查 OSS 跨域配置后重试'
+      } finally {
+        this.answerPreviewLoading = false
+      }
+    },
+    downloadPreviewedAnswer() {
+      if (!this.answerPreviewBlob || !this.answerPreviewTarget) return
+      const objectUrl = URL.createObjectURL(this.answerPreviewBlob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = this.answerPreviewTarget.answerFileName || 'homework-answer'
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+      this.$message.success('已开始下载原文件')
+    },
+    revokeAnswerPreviewUrl() {
+      if (this.answerPreviewObjectUrl) {
+        URL.revokeObjectURL(this.answerPreviewObjectUrl)
+        this.answerPreviewObjectUrl = ''
+      }
+    },
+    resetAnswerPreview() {
+      this.revokeAnswerPreviewUrl()
+      this.answerPreviewTarget = null
+      this.answerPreviewError = ''
+      this.answerPreviewType = ''
+      this.answerPreviewHtml = ''
+      this.answerPreviewBlob = null
     },
     replaceHomeworkItem(updatedHomework) {
       const classRow = this.records.find(row => {
@@ -592,5 +731,67 @@ export default {
   .answer-desk { grid-template-columns: 1fr; }
   .answer-actions { grid-row: 2; }
   .visibility-control { grid-column: 1; }
+}
+</style>
+
+<style>
+.answer-preview-dialog .el-dialog__body { padding: 0; }
+.answer-preview-dialog .el-dialog { max-width: 900px; }
+.answer-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 16px 11px 20px;
+  border-top: 1px solid #E5EAE5;
+  border-bottom: 1px solid #DDE5DF;
+  background: #F7FAF8;
+}
+.answer-preview-toolbar > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.answer-preview-toolbar span { color: #748079; font-size: 9px; letter-spacing: .1em; }
+.answer-preview-toolbar b { overflow: hidden; color: #26342D; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.answer-preview-toolbar .el-button { flex: none; border-color: #B8CBC0; color: #176B53; background: #FFFFFF; }
+.answer-preview-state {
+  display: flex;
+  min-height: 500px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #6D7972;
+  font-size: 12px;
+}
+.answer-preview-state > i { font-size: 24px; }
+.answer-preview-state.is-error { flex-direction: column; color: #B45F45; }
+.answer-preview-state.is-unsupported { flex-direction: column; }
+.answer-preview-state.is-unsupported b { margin-top: 6px; color: #34423A; font-size: 14px; }
+.answer-pdf-frame { display: block; width: 100%; height: 72vh; border: 0; background: #E8ECE9; }
+.answer-preview-markdown {
+  box-sizing: border-box;
+  min-height: 500px;
+  max-height: 72vh;
+  overflow-y: auto;
+  padding: 36px 48px 64px;
+  color: #26342D;
+  font: 14px/1.78 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+}
+.answer-preview-markdown h1,
+.answer-preview-markdown h2,
+.answer-preview-markdown h3 { margin: 1.5em 0 .65em; color: #14251C; line-height: 1.3; }
+.answer-preview-markdown h1 { margin-top: 0; padding-bottom: .4em; border-bottom: 2px solid #C6D5CC; font-size: 27px; }
+.answer-preview-markdown h2 { padding-bottom: .35em; border-bottom: 1px solid #DEE6E0; font-size: 21px; }
+.answer-preview-markdown h3 { font-size: 17px; }
+.answer-preview-markdown p { margin: .75em 0; }
+.answer-preview-markdown a { color: #116F56; }
+.answer-preview-markdown code { padding: 2px 5px; border-radius: 4px; background: #EEF4F0; color: #A8462F; font: 12px Consolas, monospace; }
+.answer-preview-markdown pre { overflow-x: auto; padding: 16px 18px; border-left: 3px solid #B98A2F; border-radius: 5px; background: #18251F; }
+.answer-preview-markdown pre code { padding: 0; background: transparent; color: #E5ECE7; }
+.answer-preview-markdown blockquote { margin: 1.2em 0; padding: 9px 16px; border-left: 3px solid #2A8469; background: #F1F7F4; color: #52625A; }
+.answer-preview-markdown table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.answer-preview-markdown th,
+.answer-preview-markdown td { padding: 8px 10px; border: 1px solid #DCE4DE; text-align: left; }
+.answer-preview-markdown th { background: #F1F5F2; }
+@media (max-width: 720px) {
+  .answer-preview-markdown { padding: 26px 20px 44px; }
+  .answer-preview-toolbar { align-items: flex-start; }
 }
 </style>

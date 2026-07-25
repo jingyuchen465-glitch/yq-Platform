@@ -38,7 +38,7 @@ import java.util.List;
 @Validated
 @RequiredArgsConstructor
 @RequestMapping("/emp/homeworks")
-@Tag(name = "作业管理", description = "作业发布相关接口")
+@Tag(name = "作业管理", description = "作业发布与详情管理接口")
 public class HomeworkController {
 
     private final IHomeworkService homeworkService;
@@ -67,8 +67,8 @@ public class HomeworkController {
     }
 
     @GetMapping("/statuses")
-    @Operation(summary = "分页查询班级作业发布情况", description = "按发布日期或截止日期查询每个班级的匹配作业")
-    @HasPermission(code = "sys:homework:status:page", name = "查询作业发布情况", description = "分页查询班级作业发布情况")
+    @Operation(summary = "分页查询班级作业详情", description = "按发布日期或截止日期查询每个班级的匹配作业")
+    @HasPermission(code = "sys:homework:status:page", name = "查询作业详情", description = "分页查询班级作业详情")
     public ApiResponse<PageResult<HomeworkClassStatusRes>> pageStatus(
             @Valid @ParameterObject HomeworkStatusPageReq req) {
         return ApiResponse.success(homeworkService.pageStatus(req));

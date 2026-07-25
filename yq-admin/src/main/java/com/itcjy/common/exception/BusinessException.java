@@ -51,6 +51,7 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException HOMEWORK_TIME_ERROR = new BusinessException(19003, "Invalid homework time range");
     public static final BusinessException HOMEWORK_NOT_EXIST = new BusinessException(19004, "Homework not found");
     public static final BusinessException HOMEWORK_ANSWER_NOT_EXIST = new BusinessException(19005, "Homework answer not found");
+    public static final BusinessException HOMEWORK_SUBMISSION_NOT_EXIST = new BusinessException(19006, "Homework submission not found");
 
     public BusinessException(String message) {
         super(message);

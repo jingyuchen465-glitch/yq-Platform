@@ -87,7 +87,13 @@ const routes = [
         path: 'homework/status',
         name: 'HomeworkStatus',
         component: () => import('@/views/homework/HomeworkStatus.vue'),
-        meta: { title: '作业发布情况', icon: 'el-icon-data-analysis' }
+        meta: { title: '作业详情管理', icon: 'el-icon-data-analysis' }
+      },
+      {
+        path: 'homework/:homeworkId/submissions',
+        name: 'HomeworkSubmissionManage',
+        component: () => import('@/views/homework/HomeworkSubmissionManage.vue'),
+        meta: { title: '学生作业批改', icon: 'el-icon-document-checked', hidden: true }
       },
       {
         path: 'teacher-schedule',

@@ -13,7 +13,7 @@ import java.time.LocalDate;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@Schema(description = "班级作业发布情况分页查询")
+@Schema(description = "班级作业详情分页查询")
 public class HomeworkStatusPageReq extends BasePageReq {
 
     @Schema(description = "日期类型：HOMEWORK_DATE-发布日期，DEADLINE_DATE-截止日期")
