@@ -7,6 +7,7 @@ public class BusinessException extends RuntimeException {
 
     private final Integer code;
 
+    public static final BusinessException ACCOUNT_NOT_ACTIVE = new BusinessException(10000, "Account not active");
     public static final BusinessException USER_EXIST = new BusinessException(10001, "User already exists");
     public static final BusinessException USER_NOT_EXIST = new BusinessException(10002, "User not found");
     public static final BusinessException PERMISSION_EXIST = new BusinessException(11001, "Permission already exists");

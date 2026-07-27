@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.interceptor.AuthThreadlocal;
+import com.itcjy.common.interceptor.LoginSession;
 import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.mapper.market.MarketProductCourseMapper;
 import com.itcjy.emp.mapper.market.MarketProductMapper;
@@ -18,7 +19,6 @@ import com.itcjy.emp.pojo.req.market.MarketProductPageReq;
 import com.itcjy.emp.pojo.req.market.MarketProductUpdateReq;
 import com.itcjy.emp.pojo.res.market.MarketCourseOptionRes;
 import com.itcjy.emp.pojo.res.market.MarketProductRes;
-import com.itcjy.emp.pojo.res.system.LoginInfo;
 import com.itcjy.emp.service.academic.ISysCourseService;
 import com.itcjy.emp.service.market.IMarketProductService;
 import lombok.RequiredArgsConstructor;
@@ -196,11 +196,11 @@ public class MarketProductServiceImpl extends ServiceImpl<MarketProductMapper, M
     }
 
     private Long getCurrentUserId() {
-        LoginInfo loginInfo = AuthThreadlocal.getLoginInfo();
-        if (loginInfo == null || loginInfo.getUserDetailRes() == null) {
+        LoginSession loginInfo = AuthThreadlocal.getLoginInfo();
+        if (loginInfo == null) {
             return null;
         }
-        return loginInfo.getUserDetailRes().getId();
+        return loginInfo.getPrincipalId();
     }
 
     private record CourseSelection(List<Long> courseIds, String courseName) {

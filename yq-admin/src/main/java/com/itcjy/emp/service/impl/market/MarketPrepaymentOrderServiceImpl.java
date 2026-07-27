@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.interceptor.AuthThreadlocal;
+import com.itcjy.common.interceptor.LoginSession;
 import com.itcjy.common.myEnum.ActiveEnum;
 import com.itcjy.common.pojo.PageResult;
 import com.itcjy.emp.mapper.market.MarketPrepaymentOrderMapper;
@@ -25,10 +26,9 @@ import com.itcjy.emp.pojo.res.market.MarketProductOptionRes;
 import com.itcjy.emp.pojo.res.market.MarketSalespersonOptionRes;
 import com.itcjy.emp.pojo.res.system.SysConfigItemRes;
 import com.itcjy.emp.pojo.res.system.SysConfigTypeRes;
-import com.itcjy.emp.pojo.res.system.LoginInfo;
 import com.itcjy.emp.service.market.IMarketPrepaymentOrderService;
 import com.itcjy.emp.service.market.IMarketProductService;
-import com.itcjy.emp.service.market.IStudentService;
+import com.itcjy.emp.service.stu.IStudentService;
 import com.itcjy.emp.service.system.ISysConfigService;
 import com.itcjy.emp.service.system.ISysRoleService;
 import com.itcjy.emp.service.system.ISysUserRoleService;
@@ -320,10 +320,10 @@ public class MarketPrepaymentOrderServiceImpl
     }
 
     private Long getCurrentUserId() {
-        LoginInfo loginInfo = AuthThreadlocal.getLoginInfo();
-        if (loginInfo == null || loginInfo.getUserDetailRes() == null) {
+        LoginSession loginInfo = AuthThreadlocal.getLoginInfo();
+        if (loginInfo == null || loginInfo.getPrincipalId() == null) {
             throw BusinessException.USER_NO_TOKEN;
         }
-        return loginInfo.getUserDetailRes().getId();
+        return loginInfo.getPrincipalId();
     }
 }

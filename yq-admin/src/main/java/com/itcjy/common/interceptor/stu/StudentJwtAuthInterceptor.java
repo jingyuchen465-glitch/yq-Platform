@@ -1,7 +1,9 @@
-package com.itcjy.common.interceptor;
+package com.itcjy.common.interceptor.stu;
 
 import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.exception.BusinessException;
+import com.itcjy.common.interceptor.AuthThreadlocal;
+import com.itcjy.common.interceptor.LoginSession;
 import com.itcjy.common.utils.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -19,7 +21,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 @Component
 @RequiredArgsConstructor
-public class JwtAuthInterceptor implements HandlerInterceptor {
+public class StudentJwtAuthInterceptor implements HandlerInterceptor {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final JwtUtil jwtUtil;
@@ -62,19 +64,19 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             throw BusinessException.JWT_ERROR;
         }
         String principalType = claims.get(JwtUtil.CLAIM_PRINCIPAL_TYPE, String.class);
-        if (principalType != null && !TokenConstants.PRINCIPAL_EMPLOYEE.equals(principalType)) {
+        if (principalType != null && !TokenConstants.PRINCIPAL_STUDENT.equals(principalType)) {
             throw BusinessException.JWT_ERROR;
         }
 
         // 6. 拼凑 redis key，判断 redis 是否还存在该 token
-        String redisKey = TokenConstants.USER_JWT_KEY_PREFIX + uid;
+        String redisKey = TokenConstants.STUDENT_JWT_KEY_PREFIX + uid;
         Object loginInfoObj = redisTemplate.opsForValue().get(redisKey);
         if (loginInfoObj == null) {
             throw BusinessException.USER_NO_TOKEN;
         }
         if (!(loginInfoObj instanceof LoginSession loginInfo)
                 || !uid.equals(loginInfo.getPrincipalId())
-                || !TokenConstants.PRINCIPAL_EMPLOYEE.equals(loginInfo.getPrincipalType())
+                || !TokenConstants.PRINCIPAL_STUDENT.equals(loginInfo.getPrincipalType())
                 || !token.equals(loginInfo.getToken())) {
             throw BusinessException.USER_NO_TOKEN;
         }

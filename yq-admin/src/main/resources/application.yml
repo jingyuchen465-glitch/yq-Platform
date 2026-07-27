@@ -42,8 +42,12 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
-  packages-to-scan: com.itcjy.emp.controller
-  paths-to-match: /emp/**
+  packages-to-scan:
+    - com.itcjy.emp.controller
+    - com.itcjy.stu.controller
+  paths-to-match:
+    - /emp/**
+    - /stu/**
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/*.xml

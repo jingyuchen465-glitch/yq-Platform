@@ -1,0 +1,62 @@
+:root {
+  --ink: #102a43;
+  --ink-soft: #486581;
+  --lagoon: #0e7490;
+  --lagoon-deep: #07566b;
+  --mint: #d9f3ee;
+  --sky: #e9f4fb;
+  --coral: #ff7a59;
+  --paper: #f7fafc;
+  --white: #ffffff;
+  --line: #d9e5ec;
+  --display: 'Avenir Next', 'Futura', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --body: 'Source Han Sans SC', 'Noto Sans CJK SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  --shadow: 0 24px 70px -38px rgba(16, 42, 67, .42);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid rgba(255, 122, 89, .42);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

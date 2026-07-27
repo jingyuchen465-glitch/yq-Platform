@@ -3,23 +3,20 @@ package com.itcjy.config;
 import com.itcjy.common.interceptor.JwtAuthInterceptor;
 import com.itcjy.common.interceptor.PermissionInterceptor;
 import com.itcjy.common.interceptor.SignInterceptor;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.itcjy.common.interceptor.stu.StudentJwtAuthInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
-
-    @Autowired
-    private JwtAuthInterceptor jwtAuthInterceptor;
-
-    @Autowired
-    private SignInterceptor signInterceptor;
-
-    @Autowired
-    private PermissionInterceptor permissionInterceptor;
+    private final JwtAuthInterceptor jwtAuthInterceptor;
+    private final StudentJwtAuthInterceptor studentJwtAuthInterceptor;
+    private final SignInterceptor signInterceptor;
+    private final PermissionInterceptor permissionInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -30,15 +27,21 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/emp/sysUser/login",
                         "/v3/api-docs/**",
                         "/swagger-ui.html",
-                        "/swagger-ui/**");
+                        "/swagger-ui/**"
+                        );
+        registry.addInterceptor(studentJwtAuthInterceptor)
+                .addPathPatterns("/stu/**")
+                .excludePathPatterns("/stu/login");
 
         registry.addInterceptor(signInterceptor)
-                .addPathPatterns("/emp/**")
+                .addPathPatterns("/emp/**", "/stu/**")
                 .excludePathPatterns(
                         "/emp/sysUser/login",
                         "/v3/api-docs/**",
                         "/swagger-ui.html",
-                        "/swagger-ui/**");
+                        "/swagger-ui/**",
+                        "/stu/login"
+                        );
 
         registry.addInterceptor(permissionInterceptor)
                 .addPathPatterns("/emp/**")

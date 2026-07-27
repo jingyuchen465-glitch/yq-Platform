@@ -1,5 +1,6 @@
 package com.itcjy.common.utils;
 
+import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.properties.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -21,6 +22,7 @@ public class JwtUtil {
     public static final String CLAIM_USER_ID = "userId";
     public static final String CLAIM_USERNAME = "username";
     public static final String CLAIM_ROLES = "roles";
+    public static final String CLAIM_PRINCIPAL_TYPE = "principalType";
 
     private static final int HS256_MIN_SECRET_LENGTH = 32;
 
@@ -31,8 +33,13 @@ public class JwtUtil {
     }
 
     public String generateToken(Long userId, String username, Collection<String> roleCodes) {
+        return generateToken(userId, username, roleCodes, TokenConstants.PRINCIPAL_EMPLOYEE);
+    }
+
+    public String generateToken(Long userId, String username, Collection<String> roleCodes, String principalType) {
         Map<String, Object> claims = new HashMap<>();
         claims.put(CLAIM_ROLES, roleCodes == null ? Collections.emptyList() : roleCodes);
+        claims.put(CLAIM_PRINCIPAL_TYPE, principalType);
         return generateToken(userId, username, claims);
     }
 

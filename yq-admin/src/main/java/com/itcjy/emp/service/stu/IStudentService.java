@@ -1,4 +1,4 @@
-package com.itcjy.emp.service.market;
+package com.itcjy.emp.service.stu;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.itcjy.stu.pojo.entity.Student;

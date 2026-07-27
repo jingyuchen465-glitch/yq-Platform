@@ -2,7 +2,6 @@ package com.itcjy.common.interceptor;
 
 import com.itcjy.common.annotations.HasPermission;
 import com.itcjy.common.exception.BusinessException;
-import com.itcjy.emp.pojo.res.system.LoginInfo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;
@@ -32,7 +31,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        LoginInfo loginInfo = AuthThreadlocal.getLoginInfo();
+        LoginSession loginInfo = AuthThreadlocal.getLoginInfo();
         if (loginInfo == null) {
             throw BusinessException.USER_NO_TOKEN;
         }

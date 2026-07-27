@@ -6,15 +6,15 @@ import cn.hutool.crypto.digest.HMac;
 import cn.hutool.crypto.digest.HmacAlgorithm;
 import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.exception.BusinessException;
-import com.itcjy.emp.pojo.res.system.LoginInfo;
-import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 
 /**
@@ -24,6 +24,7 @@ import java.time.Duration;
  * 服务端使用登录时分配的 signSecret 重新计算签名并比对，防止请求被篡改或重放。
  */
 @Component
+@RequiredArgsConstructor
 public class SignInterceptor implements HandlerInterceptor {
 
     private static final String HEADER_TIMESTAMP = "X-Timestamp";
@@ -33,8 +34,7 @@ public class SignInterceptor implements HandlerInterceptor {
     /** nonce Redis 缓存值（SETNX 只关心能否存储成功，值本身无意义） */
     private static final String NONCE_CACHE_VALUE = "1";
 
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -55,16 +55,9 @@ public class SignInterceptor implements HandlerInterceptor {
         long timestampMillis = parseTimestamp(timestamp);
         Duration nonceTtl = buildNonceTtl(timestampMillis);
 
-        // 3. SETNX 防重放：同一 nonce 在有效期内只能使用一次
-        Boolean setNonceSuccess = redisTemplate.opsForValue()
-                .setIfAbsent(TokenConstants.signNonceKey(nonce), NONCE_CACHE_VALUE, nonceTtl);
-        if (!Boolean.TRUE.equals(setNonceSuccess)) {
-            throw BusinessException.SIGN_NONCE_REPEAT;
-        }
-
         // 4. 获取当前登录用户的 signSecret
         //AuthThreadlocal.getLoginInfo()就是来着redis里面的值
-        LoginInfo loginInfo = AuthThreadlocal.getLoginInfo();
+        LoginSession loginInfo = AuthThreadlocal.getLoginInfo();
         if (loginInfo == null) {
             throw BusinessException.USER_NO_TOKEN;
         }
@@ -79,8 +72,20 @@ public class SignInterceptor implements HandlerInterceptor {
         //5.2.后端用同样的密钥和同样的算法，重新计算一遍签名。
         String serverSign = sign(source, signSecret);
         //5.3.后端算出的签名 和 前端传来的签名 是否一致
-        if (!StrUtil.equals(serverSign, sign)) {
+        if (!MessageDigest.isEqual(
+                serverSign.getBytes(StandardCharsets.UTF_8),
+                sign.getBytes(StandardCharsets.UTF_8))) {
             throw BusinessException.SIGN_ERROR;
+        }
+
+        // 6. 验签通过后再使用 SETNX 占用 nonce，避免无效签名提前消耗合法 nonce
+        Boolean setNonceSuccess = redisTemplate.opsForValue().setIfAbsent(
+                TokenConstants.signNonceKey(loginInfo.getPrincipalType(), loginInfo.getPrincipalId(), nonce),
+                NONCE_CACHE_VALUE,
+                nonceTtl
+        );
+        if (!Boolean.TRUE.equals(setNonceSuccess)) {
+            throw BusinessException.SIGN_NONCE_REPEAT;
         }
 
         return true;
@@ -101,12 +106,13 @@ public class SignInterceptor implements HandlerInterceptor {
      * 构建 nonce 缓存时长，同时校验请求是否过期
      */
     private Duration buildNonceTtl(long timestampMillis) {
-        long expireAt = timestampMillis + TokenConstants.SIGN_REQUEST_EXPIRE_DURATION.toMillis();
-        long ttlMillis = expireAt - System.currentTimeMillis();
-        if (ttlMillis <= 0) {
+        long now = System.currentTimeMillis();
+        long allowedSkew = TokenConstants.SIGN_REQUEST_EXPIRE_DURATION.toMillis();
+        if (timestampMillis < now - allowedSkew || timestampMillis > now + allowedSkew) {
             throw BusinessException.SIGN_EXPIRE;
         }
-        return Duration.ofMillis(ttlMillis);
+        long expireAt = timestampMillis + allowedSkew;
+        return Duration.ofMillis(Math.max(1, expireAt - now));
     }
 
     /**

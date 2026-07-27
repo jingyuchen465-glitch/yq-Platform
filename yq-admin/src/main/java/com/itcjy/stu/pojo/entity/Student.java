@@ -14,6 +14,13 @@ import java.time.LocalDateTime;
 @TableName("student")
 @Schema(description = "学生实体")
 public class Student {
+    // 学生状态：TEMPORARY-临时，ATSCHOOL-在校，GRADUATE-毕业，WITCHDRAWAL-退学
+    public static final String TEMPORARY = "TEMPORARY"; // 临时
+    public static final String AT_SCHOOL = "ATSCHOOL"; // 在校
+    public static final String GRADUATE = "GRADUATE"; // 毕业
+    public static final String WITCHDRAWAL = "WITCHDRAWAL"; // 退学
+
+
 
     @TableId(value = "id", type = IdType.AUTO)
     @Schema(description = "学生主键", example = "1")
@@ -34,7 +41,7 @@ public class Student {
     @Schema(description = "学生班级ID", example = "1")
     private Long classId;
 
-    @Schema(description = "学生状态：TEMPORARY-临时，PAID-已缴费等", example = "TEMPORARY")
+    @Schema(description = "学生状态：TEMPORARY-临时", example = "TEMPORARY")
     private String status;
 
     @Schema(description = "创建学生的后台用户ID", example = "1")

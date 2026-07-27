@@ -1,17 +1,12 @@
-package com.itcjy.emp.pojo.res.system;
+package com.itcjy.stu.pojo.VO;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.itcjy.common.constants.TokenConstants;
 import com.itcjy.common.interceptor.LoginSession;
 import lombok.Data;
 
-import java.util.List;
-
-/**
- * 放到Redis里面的用户信息
- */
 @Data
-@JsonIgnoreProperties({"principalId", "principalType"})
+@JsonIgnoreProperties({"principalId", "principalType", "permissions"})
 public class LoginInfo implements LoginSession {
     /** 登录令牌（JWT Token 或 Session Token） */
     private String token;
@@ -20,21 +15,15 @@ public class LoginInfo implements LoginSession {
     private String signSecret;
 
     /** 用户详细信息 */
-    private UserDetailRes userDetailRes;
-
-    /** 用户角色列表 */
-    private List<String> roles;
-
-    /** 用户权限列表 */
-    private List<String> permissions;
+    private StudentDetailsVO studentDetailsVO;
 
     @Override
     public Long getPrincipalId() {
-        return userDetailRes == null ? null : userDetailRes.getId();
+        return studentDetailsVO == null ? null : studentDetailsVO.getId();
     }
 
     @Override
     public String getPrincipalType() {
-        return TokenConstants.PRINCIPAL_EMPLOYEE;
+        return TokenConstants.PRINCIPAL_STUDENT;
     }
 }

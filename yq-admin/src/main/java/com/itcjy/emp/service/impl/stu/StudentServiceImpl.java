@@ -1,11 +1,11 @@
-package com.itcjy.emp.service.impl.market;
+package com.itcjy.emp.service.impl.stu;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.itcjy.common.constants.TokenConstants;
-import com.itcjy.emp.service.market.IStudentService;
-import com.itcjy.stu.mapper.StudentMapper;
+import com.itcjy.emp.service.stu.IStudentService;
+import com.itcjy.stu.mapper.LoginMapper;
 import com.itcjy.stu.pojo.entity.Student;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
-public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> implements IStudentService {
+public class StudentServiceImpl extends ServiceImpl<LoginMapper, Student> implements IStudentService {
 
     private static final String PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
     private static final int INITIAL_PASSWORD_LENGTH = 10;
