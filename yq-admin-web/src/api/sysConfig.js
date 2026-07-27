@@ -21,3 +21,33 @@ export function updateClassScheduleRule(data) {
     data
   })
 }
+
+export function listConfigItems(typeId) {
+  return request({
+    url: `/emp/sysConfig/item/list/${typeId}`,
+    method: 'get'
+  })
+}
+
+export function addConfigItem(data) {
+  return request({
+    url: '/emp/sysConfig/item/add',
+    method: 'post',
+    data
+  })
+}
+
+export function updateConfigItem(id, data) {
+  return request({
+    url: `/emp/sysConfig/item/update/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+export function deleteConfigItem(id) {
+  return request({
+    url: `/emp/sysConfig/item/delete/${id}`,
+    method: 'delete'
+  })
+}

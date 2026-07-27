@@ -5,9 +5,13 @@
         <p class="eyebrow">SYS:CONFIG · RULE CONTROL</p>
         <h1>规则配置</h1>
       </div>
-      <div class="head-stat">
+      <div v-if="isScheduleRule" class="head-stat">
         <b>{{ assignedDayCount }}/7</b>
         <span>星期已分配</span>
+      </div>
+      <div v-else-if="isEduBackgroundRule" class="head-stat">
+        <b>EDU</b>
+        <span>学历规则</span>
       </div>
     </header>
 
@@ -49,7 +53,7 @@
           icon="el-icon-refresh"
           aria-label="重新读取规则"
           :loading="ruleLoading"
-          :disabled="!isScheduleRule"
+          :disabled="!isScheduleRule && !isEduBackgroundRule"
           circle
           @click="reloadRule"
         />
@@ -135,6 +139,14 @@
       </footer>
     </section>
 
+    <section
+      v-else-if="isEduBackgroundRule"
+      class="edu-rule-wrapper"
+      aria-label="学历规则编辑器"
+    >
+      <edu-background-rule ref="eduRule" :type-id="selectedTypeId" />
+    </section>
+
     <section v-else-if="selectedTypeCode && !typeLoading" class="unsupported-state">
       <el-empty description="该配置类型暂未提供可视化编辑器" />
     </section>
@@ -151,8 +163,10 @@ import {
   listConfigTypes,
   updateClassScheduleRule
 } from '@/api/sysConfig'
+import EduBackgroundRule from './EduBackgroundRule.vue'
 
 const SCHEDULE_RULE_TYPE = 'CLASS_SCHEDULE_RULE'
+const EDU_BACKGROUND_RULE_TYPE = 'Educational_Background_Rule'
 const WEEK_DAYS = [
   { value: 1, label: '周一', code: 'MON' },
   { value: 2, label: '周二', code: 'TUE' },
@@ -172,6 +186,7 @@ function emptyAssignments() {
 
 export default {
   name: 'ConfigManage',
+  components: { EduBackgroundRule },
   data() {
     return {
       typeLoading: false,
@@ -193,6 +208,12 @@ export default {
     },
     isScheduleRule() {
       return this.selectedTypeCode === SCHEDULE_RULE_TYPE
+    },
+    isEduBackgroundRule() {
+      return this.selectedTypeCode === EDU_BACKGROUND_RULE_TYPE
+    },
+    selectedTypeId() {
+      return this.selectedType ? this.selectedType.id : null
     },
     modeCounts() {
       return WEEK_DAYS.reduce((counts, day) => {
@@ -314,6 +335,10 @@ export default {
         } catch (e) {
           return
         }
+      }
+      if (this.isEduBackgroundRule) {
+        this.$refs.eduRule && this.$refs.eduRule.loadItems()
+        return
       }
       await this.loadSelectedRule()
     },
