@@ -84,6 +84,12 @@ const routes = [
         meta: { title: '预订单管理', icon: 'el-icon-s-order' }
       },
       {
+        path: 'student',
+        name: 'StudentManage',
+        component: () => import('@/views/student/StudentManage.vue'),
+        meta: { title: '学员管理', icon: 'el-icon-user-solid' }
+      },
+      {
         path: 'class',
         name: 'ClassManage',
         component: () => import('@/views/class/ClassManage.vue'),

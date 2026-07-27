@@ -74,6 +74,17 @@ class StudentJwtAuthInterceptorTest {
     }
 
     @Test
+    @DisplayName("学员会话被管理端清理后原令牌应立即失效")
+    void shouldRejectTokenAfterSessionIsEvicted() {
+        String token = studentToken(7L);
+        when(valueOperations.get(TokenConstants.STUDENT_JWT_KEY_PREFIX + 7L)).thenReturn(null);
+
+        assertThatThrownBy(() -> interceptor.preHandle(
+                requestWithToken(token), new MockHttpServletResponse(), new Object()))
+                .isSameAs(BusinessException.USER_NO_TOKEN);
+    }
+
+    @Test
     @DisplayName("员工令牌不能访问学生接口")
     void shouldRejectEmployeeTokenOnStudentEndpoint() {
         String employeeToken = jwtUtil.generateToken(7L, "admin", Collections.emptyList());
