@@ -50,9 +50,49 @@
           <p class="eyebrow">NEXT STOP</p>
           <div class="next-number">01</div>
           <h2>学习功能正在接入</h2>
-          <p>当前登录、身份校验和安全请求通道已经可用。下一步可在学生端继续接入课表、作业与提交记录。</p>
+          <p>预订单查询已接入。确认课程与金额后，可直接前往支付宝收银台完成支付。</p>
           <div class="module-list">
-            <span>课程表</span><span>我的作业</span><span>学习记录</span>
+            <span class="module-ready"><i></i>我的预订单</span><span>课程表</span><span>我的作业</span>
+          </div>
+
+          <div class="order-panel" aria-live="polite">
+            <div class="order-panel-heading">
+              <div><strong>我的预订单</strong><small>{{ orders.length }} 笔记录</small></div>
+              <button v-if="orderError" type="button" @click="loadPrepaymentOrders">重新查询</button>
+            </div>
+            <p v-if="paymentError" class="payment-message" role="alert">{{ paymentError }}</p>
+
+            <div v-if="ordersLoading" class="order-state">
+              <span class="loading-ring" aria-hidden="true"></span>正在查询预订单…
+            </div>
+            <div v-else-if="orderError" class="order-state order-state-error" role="alert">
+              {{ orderError }}
+            </div>
+            <div v-else-if="!orders.length" class="order-state">
+              暂无预订单，销售老师录入后会显示在这里。
+            </div>
+            <ul v-else class="order-list">
+              <li v-for="order in orders" :key="order.id" class="order-ticket">
+                <div class="order-main">
+                  <span class="order-id">PRE · {{ order.id }}</span>
+                  <strong>{{ order.productName || '未命名课程' }}</strong>
+                  <small>
+                    {{ order.salespersonName ? `顾问 ${order.salespersonName}` : '课程顾问待确认' }}
+                    · <time :datetime="order.createdAt">{{ formatOrderDate(order.createdAt) }}</time>
+                  </small>
+                </div>
+                <div class="order-action">
+                  <span><small>应付</small>¥{{ formatMoney(order.productPrice) }}</span>
+                  <button
+                    type="button"
+                    :disabled="payingOrderId !== null"
+                    @click="handlePay(order)"
+                  >
+                    {{ payingOrderId === order.id ? '跳转中…' : '去支付' }}
+                  </button>
+                </div>
+              </li>
+            </ul>
           </div>
         </article>
       </section>
@@ -62,6 +102,7 @@
 
 <script>
 import { getCurrentStudent, logout } from '@/api/auth'
+import { createAlipayTrade, getCurrentStudentPrepaymentOrders } from '@/api/prepayment'
 import {
   clearStudentSession,
   getStudentProfile,
@@ -81,7 +122,12 @@ export default {
     return {
       profile: getStudentProfile(),
       errorMessage: '',
-      loggingOut: false
+      loggingOut: false,
+      orders: [],
+      ordersLoading: true,
+      orderError: '',
+      paymentError: '',
+      payingOrderId: null
     }
   },
   computed: {
@@ -105,6 +151,7 @@ export default {
   },
   mounted() {
     this.refreshProfile()
+    this.loadPrepaymentOrders()
   },
   methods: {
     async refreshProfile() {
@@ -115,6 +162,79 @@ export default {
       } catch (error) {
         this.errorMessage = error.message || '学生资料暂时无法更新'
       }
+    },
+    async loadPrepaymentOrders() {
+      this.ordersLoading = true
+      this.orderError = ''
+      this.paymentError = ''
+      try {
+        const response = await getCurrentStudentPrepaymentOrders()
+        this.orders = Array.isArray(response.data) ? response.data : []
+      } catch (error) {
+        this.orders = []
+        this.orderError = error.message || '预订单暂时无法查询，请稍后重试'
+      } finally {
+        this.ordersLoading = false
+      }
+    },
+    async handlePay(order) {
+      const amount = Number(order.productPrice)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        this.paymentError = '当前预订单金额无效，请联系课程顾问确认'
+        return
+      }
+
+      this.payingOrderId = order.id
+      this.paymentError = ''
+      try {
+        const response = await createAlipayTrade({
+          outTradeNo: order.outTradeNo,
+          totalAmount: order.productPrice,
+          subject: `${order.productName || '课程'}预订单`,
+          body: `YQ 学习中心预订单 #${order.id}`,
+          timeoutExpress: '30m'
+        })
+        const payForm = response.data && response.data.payForm
+        this.submitAlipayForm(payForm)
+      } catch (error) {
+        this.paymentError = error.message || '支付宝收银台暂时无法打开，请稍后重试'
+        this.payingOrderId = null
+      }
+    },
+    submitAlipayForm(payForm) {
+      if (typeof payForm !== 'string' || !payForm.trim()) {
+        throw new Error('支付表单为空，请稍后重试')
+      }
+
+      const parsed = new DOMParser().parseFromString(payForm, 'text/html')
+      const sourceForm = parsed.querySelector('form')
+      if (!sourceForm) throw new Error('支付表单格式无效，请稍后重试')
+
+      const action = new URL(sourceForm.getAttribute('action') || '', window.location.href)
+      const hostname = action.hostname.toLowerCase()
+      const isAlipayHost = hostname === 'alipay.com' || hostname.endsWith('.alipay.com') ||
+        hostname === 'alipaydev.com' || hostname.endsWith('.alipaydev.com')
+      if (action.protocol !== 'https:' || !isAlipayHost) {
+        throw new Error('支付地址校验失败，请稍后重试')
+      }
+
+      const form = document.importNode(sourceForm, true)
+      form.style.display = 'none'
+      form.removeAttribute('target')
+      document.body.appendChild(form)
+      HTMLFormElement.prototype.submit.call(form)
+    },
+    formatMoney(value) {
+      const amount = Number(value)
+      return Number.isFinite(amount)
+        ? new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+        : '0.00'
+    },
+    formatOrderDate(value) {
+      if (!value) return '时间待确认'
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return '时间待确认'
+      return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(date)
     },
     async handleLogout() {
       this.loggingOut = true
@@ -165,7 +285,7 @@ export default {
 .center-mark b { font: 800 24px var(--display); }
 .center-mark small { margin-top: 2px; font: 8px var(--mono); letter-spacing: .18em; }
 .page-message { margin-top: 20px; padding: 12px 16px; border-left: 3px solid var(--coral); background: #fff0ec; color: #9d3f2a; font-size: 13px; }
-.dashboard-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 22px; margin-top: 24px; }
+.dashboard-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 22px; margin-top: 24px; }
 .profile-card, .next-card { min-height: 325px; padding: 30px; border: 1px solid var(--line); background: #fff; box-shadow: 0 18px 50px -44px rgba(16, 42, 67, .5); }
 .profile-card { border-radius: 8px 24px 24px 24px; }
 .profile-card header { display: flex; align-items: flex-start; justify-content: space-between; }
@@ -177,9 +297,35 @@ export default {
 .profile-card dd { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; font-weight: 650; }
 .next-card { position: relative; overflow: hidden; border-radius: 24px 8px 24px 24px; background: var(--sky); }
 .next-number { position: absolute; right: -4px; top: -28px; color: rgba(14, 116, 144, .08); font: 800 120px var(--display); }
+.next-card > *:not(.next-number) { position: relative; z-index: 1; }
 .next-card > p:not(.eyebrow) { max-width: 390px; margin-top: 14px; color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
-.module-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 32px; }
+.module-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .module-list span { padding: 8px 11px; border: 1px dashed rgba(14, 116, 144, .3); border-radius: 8px; color: var(--lagoon-deep); background: rgba(255, 255, 255, .5); font-size: 11px; }
+.module-list .module-ready { display: inline-flex; align-items: center; gap: 7px; border-style: solid; background: #fff; font-weight: 700; }
+.module-ready i { width: 6px; height: 6px; border-radius: 50%; background: #2bb381; box-shadow: 0 0 0 3px rgba(43, 179, 129, .12); }
+.order-panel { margin-top: 20px; border-top: 1px solid rgba(14, 116, 144, .13); padding-top: 18px; }
+.order-panel-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+.order-panel-heading > div { display: flex; align-items: baseline; gap: 9px; }
+.order-panel-heading strong { font: 700 13px var(--display); }
+.order-panel-heading small { color: var(--ink-soft); font: 9px var(--mono); }
+.order-panel-heading button { border: 0; color: var(--lagoon); background: transparent; font-size: 11px; font-weight: 700; }
+.payment-message { margin-bottom: 10px; padding: 9px 11px; border-radius: 8px; color: #9d3f2a; background: #fff5f2; font-size: 10px; line-height: 1.5; }
+.order-state { min-height: 74px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 16px; border: 1px dashed rgba(14, 116, 144, .22); border-radius: 12px; color: var(--ink-soft); background: rgba(255, 255, 255, .44); text-align: center; font-size: 11px; line-height: 1.6; }
+.order-state-error { color: #9d3f2a; border-color: rgba(255, 122, 89, .32); background: #fff5f2; }
+.loading-ring { width: 15px; height: 15px; border: 2px solid rgba(14, 116, 144, .18); border-top-color: var(--lagoon); border-radius: 50%; animation: spin .75s linear infinite; }
+.order-list { max-height: 300px; display: grid; gap: 9px; overflow-y: auto; list-style: none; scrollbar-width: thin; scrollbar-color: rgba(14, 116, 144, .25) transparent; }
+.order-ticket { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 14px 14px 14px 17px; border: 1px solid rgba(14, 116, 144, .13); border-left: 3px solid var(--lagoon); border-radius: 6px 14px 14px 6px; background: rgba(255, 255, 255, .88); box-shadow: 0 10px 24px -23px rgba(7, 86, 107, .9); }
+.order-main { min-width: 0; display: flex; flex-direction: column; }
+.order-main .order-id { color: var(--lagoon); font: 650 8px var(--mono); letter-spacing: .14em; }
+.order-main strong { margin-top: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.order-main small { margin-top: 5px; overflow: hidden; color: var(--ink-soft); text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.order-action { display: flex; align-items: center; gap: 11px; }
+.order-action > span { display: flex; flex-direction: column; color: var(--ink); font: 750 14px var(--display); text-align: right; }
+.order-action > span small { margin-bottom: 2px; color: var(--ink-soft); font: 8px var(--body); }
+.order-action button { min-width: 68px; padding: 9px 11px; border: 0; border-radius: 9px; color: #fff; background: var(--coral); box-shadow: 0 8px 18px -11px #9d3f2a; font-size: 11px; font-weight: 750; transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; }
+.order-action button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 20px -10px #9d3f2a; }
+.order-action button:disabled { cursor: wait; opacity: .55; }
+@keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 800px) {
   .topbar { padding-inline: 20px; }
   .student-menu div { display: none; }
@@ -198,5 +344,8 @@ export default {
   .welcome-copy h1 { font-size: 34px; }
   .profile-card, .next-card { padding: 24px; }
   .profile-card dl { grid-template-columns: 1fr; }
+  .order-ticket { grid-template-columns: 1fr; gap: 12px; }
+  .order-action { justify-content: space-between; }
+  .order-action > span { text-align: left; }
 }
 </style>
