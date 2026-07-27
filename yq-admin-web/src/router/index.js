@@ -78,6 +78,12 @@ const routes = [
         meta: { title: '产品管理', icon: 'el-icon-goods' }
       },
       {
+        path: 'prepayment-order',
+        name: 'PrepaymentOrderManage',
+        component: () => import('@/views/prepayment/PrepaymentOrderManage.vue'),
+        meta: { title: '预订单管理', icon: 'el-icon-s-order' }
+      },
+      {
         path: 'class',
         name: 'ClassManage',
         component: () => import('@/views/class/ClassManage.vue'),

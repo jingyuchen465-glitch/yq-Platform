@@ -164,7 +164,8 @@ export default {
         { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
       ],
       marketMenuItems: [
-        { path: '/product', title: '产品管理', icon: 'el-icon-goods' }
+        { path: '/product', title: '产品管理', icon: 'el-icon-goods' },
+        { path: '/prepayment-order', title: '预订单管理', icon: 'el-icon-s-order' }
       ],
       systemMenuItems: [
         { path: '/config', title: '规则配置', icon: 'el-icon-setting' }
