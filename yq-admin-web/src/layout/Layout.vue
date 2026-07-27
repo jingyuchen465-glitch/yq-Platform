@@ -70,6 +70,21 @@
         </div>
       </nav>
 
+
+      <p class="nav-cap">产品运营</p>
+      <nav class="nav">
+        <router-link
+          v-for="item in marketMenuItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: activeMenu === item.path }"
+        >
+          <i :class="item.icon"></i>
+          <span>{{ item.title }}</span>
+        </router-link>
+      </nav>
+
       <p class="nav-cap">系统设置</p>
       <nav class="nav">
         <router-link
@@ -147,6 +162,9 @@ export default {
         },
         { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },
         { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
+      ],
+      marketMenuItems: [
+        { path: '/product', title: '产品管理', icon: 'el-icon-goods' }
       ],
       systemMenuItems: [
         { path: '/config', title: '规则配置', icon: 'el-icon-setting' }

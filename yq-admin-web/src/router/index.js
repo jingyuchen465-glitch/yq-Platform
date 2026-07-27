@@ -72,6 +72,12 @@ const routes = [
         meta: { title: '课程管理', icon: 'el-icon-reading' }
       },
       {
+        path: 'product',
+        name: 'ProductManage',
+        component: () => import('@/views/product/ProductManage.vue'),
+        meta: { title: '产品管理', icon: 'el-icon-goods' }
+      },
+      {
         path: 'class',
         name: 'ClassManage',
         component: () => import('@/views/class/ClassManage.vue'),
