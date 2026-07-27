@@ -166,6 +166,7 @@ export default {
       marketMenuItems: [
         { path: '/product', title: '产品管理', icon: 'el-icon-goods' },
         { path: '/prepayment-order', title: '预订单管理', icon: 'el-icon-s-order' },
+        { path: '/order-payment', title: '订单管理', icon: 'el-icon-bank-card' },
         { path: '/student', title: '学员管理', icon: 'el-icon-user-solid' }
       ],
       systemMenuItems: [

@@ -278,6 +278,10 @@ public class SysConfigServiceImpl implements ISysConfigService {
         }
     }
 
+    /**
+     * 把排课日期规则缓存到Redis
+     * @param rule
+     */
     private void cacheClassScheduleRule(ClassScheduleRuleRes rule) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put(ClassScheduleConstants.RuleKey.CLASS_DAYS, joinDays(rule.classDays()));

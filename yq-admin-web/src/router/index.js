@@ -84,6 +84,12 @@ const routes = [
         meta: { title: '预订单管理', icon: 'el-icon-s-order' }
       },
       {
+        path: 'order-payment',
+        name: 'OrderPaymentManage',
+        component: () => import('@/views/order/OrderPaymentManage.vue'),
+        meta: { title: '订单管理', icon: 'el-icon-bank-card' }
+      },
+      {
         path: 'student',
         name: 'StudentManage',
         component: () => import('@/views/student/StudentManage.vue'),

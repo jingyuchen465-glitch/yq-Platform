@@ -11,16 +11,27 @@ import com.alipay.api.response.AlipayTradePagePayResponse;
 import com.alipay.api.response.AlipayTradeQueryResponse;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.properties.AlipayProperties;
+import com.itcjy.emp.pojo.entity.MarketPrepaymentOrder;
+import com.itcjy.emp.pojo.entity.OrderPayment;
 import com.itcjy.emp.pojo.req.pay.AlipayTradeCreateReq;
+import com.itcjy.emp.pojo.req.pay.OrderPaymentCreateReq;
+import com.itcjy.emp.pojo.req.pay.OrderPaymentUpdateReq;
 import com.itcjy.emp.pojo.res.pay.AlipayTradeCreateRes;
 import com.itcjy.emp.pojo.res.pay.AlipayTradeQueryRes;
+import com.itcjy.emp.service.market.IMarketPrepaymentOrderService;
+import com.itcjy.emp.service.market.IOrderPaymentService;
 import com.itcjy.emp.service.pay.IAlipayService;
+import com.itcjy.emp.service.stu.IStudentService;
+import com.itcjy.stu.pojo.entity.Student;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 /**
@@ -41,11 +52,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AlipayServiceImpl implements IAlipayService {
 
+    private static final String TRADE_NO_PREFIX = "YQPREPAY";
+    private static final DateTimeFormatter PAY_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
     /** 支付宝SDK客户端，由配置类注入 */
     private final AlipayClient alipayClient;
 
     /** 支付宝配置属性（appId、密钥、回调地址等） */
     private final AlipayProperties alipayProperties;
+
+    private final IMarketPrepaymentOrderService prepaymentOrderService;
+    private final IStudentService studentService;
+    private final IOrderPaymentService orderPaymentService;
 
     /**
      * 创建电脑网站支付订单（PC端页面跳转支付）
@@ -143,6 +161,74 @@ public class AlipayServiceImpl implements IAlipayService {
     }
 
     /**
+     * 支付成功业务处理：更新学生状态为在校 + 写入支付订单记录
+     *
+     * @param outTradeNo  商户订单号（格式：YQPREPAY + 预订单ID）
+     * @param tradeNo     支付宝交易号
+     * @param totalAmount 订单金额
+     * @param gmtPayment  支付时间（支付宝格式 yyyy-MM-dd HH:mm:ss）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void handleTradeSuccess(String outTradeNo, String tradeNo, String totalAmount, String gmtPayment) {
+        // 1. 从 outTradeNo 解析预订单ID
+        if (outTradeNo == null || !outTradeNo.startsWith(TRADE_NO_PREFIX)) {
+            log.warn("无法解析预订单ID，outTradeNo={}", outTradeNo);
+            return;
+        }
+        Long prepaymentOrderId;
+        try {
+            prepaymentOrderId = Long.parseLong(outTradeNo.substring(TRADE_NO_PREFIX.length()));
+        } catch (NumberFormatException e) {
+            log.warn("预订单ID格式非法，outTradeNo={}", outTradeNo);
+            return;
+        }
+
+        // 2. 查询预订单
+        MarketPrepaymentOrder prepayOrder = prepaymentOrderService.getById(prepaymentOrderId);
+        if (prepayOrder == null) {
+            log.warn("预订单不存在，prepaymentOrderId={}", prepaymentOrderId);
+            return;
+        }
+
+        // 3. 更新学生状态为在校
+        Student student = studentService.lambdaQuery()
+                .eq(Student::getPhone, prepayOrder.getPhone())
+                .one();
+        if (student != null && !Student.AT_SCHOOL.equals(student.getStatus())) {
+            student.setStatus(Student.AT_SCHOOL);
+            student.setUpdatedAt(LocalDateTime.now());
+            studentService.updateById(student);
+            log.info("学生状态已更新为在校，phone={}", prepayOrder.getPhone());
+        }
+
+        // 4. 写入支付订单记录
+        OrderPaymentCreateReq payReq = new OrderPaymentCreateReq();
+        payReq.setOrderNo(outTradeNo);
+        payReq.setStudentPhone(prepayOrder.getPhone());
+        payReq.setStudentName(prepayOrder.getName());
+        payReq.setProductId(String.valueOf(prepayOrder.getProductId()));
+        payReq.setOrderAmount(new BigDecimal(totalAmount));
+        payReq.setPrepaymentOrderId(String.valueOf(prepaymentOrderId));
+        payReq.setStatus("PAID");
+        orderPaymentService.addOrderPayment(payReq);
+
+        // 5. 回填渠道订单号和支付成功时间到支付订单
+        if (tradeNo != null || gmtPayment != null) {
+            OrderPayment created = orderPaymentService.lambdaQuery()
+                    .eq(OrderPayment::getOrderNo, outTradeNo)
+                    .one();
+            if (created != null) {
+                OrderPaymentUpdateReq updateReq = new OrderPaymentUpdateReq();
+                updateReq.setUniqueOrderNo(tradeNo);
+                if (gmtPayment != null) {
+                    updateReq.setPaySuccessTime(LocalDateTime.parse(gmtPayment, PAY_TIME_FORMATTER));
+                }
+                orderPaymentService.updateOrderPayment(created.getId(), updateReq);
+            }
+        }
+    }
+
+    /**
      * 处理支付宝异步通知（回调）
      * <p>
      * 支付宝在用户完成支付后，会向 notifyUrl 发送 POST 异步通知。
@@ -189,8 +275,7 @@ public class AlipayServiceImpl implements IAlipayService {
 
             // 4. 根据交易状态处理业务逻辑
             if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
-                // TODO: 在此处处理支付成功的业务逻辑
-                // 例如：更新订单状态、开通课程权限等
+                handleTradeSuccess(outTradeNo, tradeNo, totalAmount, params.get("gmt_payment"));
                 log.info("支付成功，outTradeNo={}，tradeNo={}", outTradeNo, tradeNo);
             }
 

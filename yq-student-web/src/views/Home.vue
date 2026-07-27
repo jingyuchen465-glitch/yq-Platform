@@ -84,12 +84,14 @@
                 <div class="order-action">
                   <span><small>应付</small>¥{{ formatMoney(order.productPrice) }}</span>
                   <button
+                    v-if="isTemporaryStudent"
                     type="button"
                     :disabled="payingOrderId !== null"
                     @click="handlePay(order)"
                   >
                     {{ payingOrderId === order.id ? '跳转中…' : '去支付' }}
                   </button>
+                  <button v-else type="button" class="btn-paid" disabled>已支付</button>
                 </div>
               </li>
             </ul>
@@ -147,6 +149,9 @@ export default {
       if (hour < 14) return '中午好'
       if (hour < 18) return '下午好'
       return '晚上好'
+    },
+    isTemporaryStudent() {
+      return !this.profile.status || this.profile.status === 'TEMPORARY'
     }
   },
   mounted() {
@@ -325,6 +330,7 @@ export default {
 .order-action button { min-width: 68px; padding: 9px 11px; border: 0; border-radius: 9px; color: #fff; background: var(--coral); box-shadow: 0 8px 18px -11px #9d3f2a; font-size: 11px; font-weight: 750; transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease; }
 .order-action button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 10px 20px -10px #9d3f2a; }
 .order-action button:disabled { cursor: wait; opacity: .55; }
+.order-action button.btn-paid { background: #86b8a8; box-shadow: none; cursor: default; opacity: .85; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 800px) {
   .topbar { padding-inline: 20px; }

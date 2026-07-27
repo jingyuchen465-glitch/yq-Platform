@@ -55,6 +55,8 @@ public class BusinessException extends RuntimeException {
     public static final BusinessException HOMEWORK_SUBMISSION_NOT_EXIST = new BusinessException(19006, "Homework submission not found");
     public static final BusinessException STUDENT_EXIST = new BusinessException(20001, "Student already exists");
     public static final BusinessException STUDENT_NOT_EXIST = new BusinessException(20002, "Student not found");
+    public static final BusinessException ORDER_PAYMENT_NOT_EXIST = new BusinessException(21001, "Payment order not found");
+    public static final BusinessException ORDER_PAYMENT_EXIST = new BusinessException(21002, "Payment order already exists");
 
     public BusinessException(String message) {
         super(message);
