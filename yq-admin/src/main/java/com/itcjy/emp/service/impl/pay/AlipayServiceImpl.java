@@ -6,13 +6,16 @@ import com.alipay.api.AlipayClient;
 import com.alipay.api.domain.AlipayTradeCloseModel;
 import com.alipay.api.domain.AlipayTradePagePayModel;
 import com.alipay.api.domain.AlipayTradeQueryModel;
+import com.alipay.api.domain.AlipayTradeRefundModel;
 import com.alipay.api.internal.util.AlipaySignature;
 import com.alipay.api.request.AlipayTradeCloseRequest;
 import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.alipay.api.request.AlipayTradeQueryRequest;
+import com.alipay.api.request.AlipayTradeRefundRequest;
 import com.alipay.api.response.AlipayTradeCloseResponse;
 import com.alipay.api.response.AlipayTradePagePayResponse;
 import com.alipay.api.response.AlipayTradeQueryResponse;
+import com.alipay.api.response.AlipayTradeRefundResponse;
 import com.itcjy.common.exception.BusinessException;
 import com.itcjy.common.properties.AlipayProperties;
 import com.itcjy.common.properties.PaymentProperties;
@@ -22,6 +25,8 @@ import com.itcjy.emp.pojo.enums.PaymentCloseReason;
 import com.itcjy.emp.pojo.enums.PaymentOrderStatus;
 import com.itcjy.emp.pojo.message.PaymentTimeoutMessage;
 import com.itcjy.emp.pojo.res.pay.AlipayTradeCreateRes;
+import com.itcjy.emp.pojo.entity.PaymentRefundRequest;
+import com.itcjy.emp.pojo.res.pay.AlipayRefundRes;
 import com.itcjy.emp.service.market.IMarketPrepaymentOrderService;
 import com.itcjy.emp.service.market.IOrderPaymentService;
 import com.itcjy.emp.service.pay.IAlipayService;
@@ -230,7 +235,11 @@ public class AlipayServiceImpl implements IAlipayService {
         }
 
         // 第一步：主动查询支付宝侧交易状态
-        AlipayTradeQueryResponse query = queryTrade(payment.getOrderNo());
+        AlipayTradeQueryResponse query = queryTradeForTimeout(payment.getOrderNo());
+        if (query == null) {
+            orderPaymentService.closePendingPayment(payment.getId(), PaymentCloseReason.TIMEOUT, LocalDateTime.now());
+            return;
+        }
         if (TRADE_SUCCESS.equals(query.getTradeStatus()) || TRADE_FINISHED.equals(query.getTradeStatus())) {
             // 补偿场景：用户已付款但回调丢失
             markTradeSuccess(payment.getOrderNo(), query.getTradeNo(), new BigDecimal(query.getTotalAmount()), formatPayTime(query));
@@ -253,7 +262,11 @@ public class AlipayServiceImpl implements IAlipayService {
         }
 
         // 第三步：关单失败，再次查询对账（防止关单瞬间用户完成付款）
-        AlipayTradeQueryResponse reconciled = queryTrade(payment.getOrderNo());
+        AlipayTradeQueryResponse reconciled = queryTradeForTimeout(payment.getOrderNo());
+        if (reconciled == null) {
+            orderPaymentService.closePendingPayment(payment.getId(), PaymentCloseReason.TIMEOUT, LocalDateTime.now());
+            return;
+        }
         if (TRADE_SUCCESS.equals(reconciled.getTradeStatus()) || TRADE_FINISHED.equals(reconciled.getTradeStatus())) {
             markTradeSuccess(payment.getOrderNo(), reconciled.getTradeNo(), new BigDecimal(reconciled.getTotalAmount()), formatPayTime(reconciled));
             return;
@@ -264,6 +277,29 @@ public class AlipayServiceImpl implements IAlipayService {
         }
         // 关单和对账均失败，抛出异常触发 MQ 重试
         throw BusinessException.REMOTE_ERROR.newInstance("Alipay close failed: " + close.getSubMsg());
+    }
+
+    @Override
+    public AlipayRefundRes refund(OrderPayment payment, PaymentRefundRequest refundRequest) {
+        if (!ALIPAY.equals(payment.getPaymentChannel())) {
+            throw BusinessException.DATA_ERROR.newInstance("Unsupported payment channel for refund");
+        }
+        AlipayTradeRefundRequest request = new AlipayTradeRefundRequest();
+        AlipayTradeRefundModel model = new AlipayTradeRefundModel();
+        model.setOutTradeNo(payment.getOrderNo());
+        model.setRefundAmount(refundRequest.getRefundAmount().toPlainString());
+        model.setOutRequestNo(refundRequest.getRefundNo());
+        model.setRefundReason(refundRequest.getReason());
+        request.setBizModel(model);
+        try {
+            AlipayTradeRefundResponse response = alipayClient.execute(request);
+            if (!response.isSuccess()) {
+                throw BusinessException.REMOTE_ERROR.newInstance("Alipay refund failed: " + response.getSubMsg());
+            }
+            return new AlipayRefundRes(response.getTradeNo());
+        } catch (AlipayApiException ex) {
+            throw BusinessException.REMOTE_ERROR.newInstance("Alipay refund request failed: " + ex.getErrMsg());
+        }
     }
 
     /**
@@ -345,6 +381,30 @@ public class AlipayServiceImpl implements IAlipayService {
                 throw BusinessException.REMOTE_ERROR.newInstance("Alipay query failed: " + response.getSubMsg());
             }
             return response;
+        } catch (AlipayApiException ex) {
+            throw BusinessException.REMOTE_ERROR.newInstance("Alipay query request failed: " + ex.getErrMsg());
+        }
+    }
+
+    /**
+     * 页面支付只生成收银台表单，买家尚未进入收银台时支付宝可能还没有创建交易。
+     * 对超时关单而言，该状态等价于未支付且无需再调用关单接口。
+     */
+    private AlipayTradeQueryResponse queryTradeForTimeout(String orderNo) {
+        AlipayTradeQueryRequest request = new AlipayTradeQueryRequest();
+        AlipayTradeQueryModel model = new AlipayTradeQueryModel();
+        model.setOutTradeNo(orderNo);
+        request.setBizModel(model);
+        try {
+            AlipayTradeQueryResponse response = alipayClient.execute(request);
+            if (response.isSuccess()) {
+                return response;
+            }
+            if ("ACQ.TRADE_NOT_EXIST".equals(response.getSubCode())) {
+                log.info("Alipay trade does not exist at timeout; closing local payment order, orderNo={}", orderNo);
+                return null;
+            }
+            throw BusinessException.REMOTE_ERROR.newInstance("Alipay query failed: " + response.getSubMsg());
         } catch (AlipayApiException ex) {
             throw BusinessException.REMOTE_ERROR.newInstance("Alipay query request failed: " + ex.getErrMsg());
         }

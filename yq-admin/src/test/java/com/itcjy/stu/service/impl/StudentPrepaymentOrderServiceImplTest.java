@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.itcjy.emp.mapper.market.MarketPrepaymentOrderMapper;
 import com.itcjy.emp.mapper.pay.OrderPaymentMapper;
+import com.itcjy.emp.mapper.pay.PaymentRefundRequestMapper;
 import com.itcjy.emp.pojo.entity.MarketPrepaymentOrder;
 import com.itcjy.emp.pojo.entity.OrderPayment;
 import com.itcjy.stu.pojo.VO.StudentDetailsVO;
@@ -32,6 +33,7 @@ class StudentPrepaymentOrderServiceImplTest {
     private LoginService loginService;
     private MarketPrepaymentOrderMapper orderMapper;
     private OrderPaymentMapper paymentMapper;
+    private PaymentRefundRequestMapper refundRequestMapper;
     private StudentPrepaymentOrderServiceImpl service;
 
     @BeforeEach
@@ -47,7 +49,8 @@ class StudentPrepaymentOrderServiceImplTest {
         loginService = mock(LoginService.class);
         orderMapper = mock(MarketPrepaymentOrderMapper.class);
         paymentMapper = mock(OrderPaymentMapper.class);
-        service = new StudentPrepaymentOrderServiceImpl(loginService, orderMapper, paymentMapper);
+        refundRequestMapper = mock(PaymentRefundRequestMapper.class);
+        service = new StudentPrepaymentOrderServiceImpl(loginService, orderMapper, paymentMapper, refundRequestMapper);
     }
 
     @Test

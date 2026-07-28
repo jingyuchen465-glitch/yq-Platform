@@ -48,4 +48,5 @@ yarn-error.log*
 #sql
 *.sql
 !yq-admin/src/main/resources/db/payment_order_migration.sql
+!yq-admin/src/main/resources/db/payment_refund_request_migration.sql
 !yq-admin/src/main/resources/db/course_homework_template.sql

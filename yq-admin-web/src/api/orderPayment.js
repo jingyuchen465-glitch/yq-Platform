@@ -16,18 +16,3 @@ export function getOrderPayment(id) {
     method: 'get'
   })
 }
-
-export function updateOrderPayment(id, data) {
-  return request({
-    url: `${baseUrl}/update/${id}`,
-    method: 'put',
-    data
-  })
-}
-
-export function deleteOrderPayment(id) {
-  return request({
-    url: `${baseUrl}/delete/${id}`,
-    method: 'delete'
-  })
-}

@@ -92,6 +92,24 @@ class AlipayServiceImplTest {
     }
 
     @Test
+    void shouldClosePendingOrderWhenAlipayTradeWasNeverCreated() throws Exception {
+        OrderPayment payment = pendingPayment(19L, "YQPmissing");
+        payment.setExpireAt(LocalDateTime.now().minusMinutes(1));
+        AlipayTradeQueryResponse response = new AlipayTradeQueryResponse();
+        response.setCode("40004");
+        response.setSubCode("ACQ.TRADE_NOT_EXIST");
+        when(orderPaymentService.getById(19L)).thenReturn(payment);
+        when(alipayClient.execute(any(AlipayTradeQueryRequest.class))).thenReturn(response);
+
+        service().handleTimeout(new PaymentTimeoutMessage(19L, "YQPmissing", payment.getExpireAt()));
+
+        verify(orderPaymentService).closePendingPayment(
+                org.mockito.ArgumentMatchers.eq(19L),
+                org.mockito.ArgumentMatchers.eq(PaymentCloseReason.TIMEOUT),
+                any());
+    }
+
+    @Test
     void shouldIgnoreTimeoutMessageForAlreadyPaidOrder() throws Exception {
         OrderPayment payment = pendingPayment(19L, "YQPpaid");
         payment.setStatus(PaymentOrderStatus.PAID.name());
