@@ -28,11 +28,14 @@ export default {
       }
       if (homeworkResult.status === 'fulfilled') {
         const items = homeworkResult.value.data || []
-        this.headerHomeworkCount = items.filter(item => !item.submission).length
+        this.headerHomeworkCount = items.filter(item => !this.isHomeworkSubmitted(item)).length
       }
       if (orderResult.status === 'fulfilled') {
         this.headerOrderCount = Array.isArray(orderResult.value.data) ? orderResult.value.data.length : 0
       }
+    },
+    isHomeworkSubmitted(item) {
+      return Boolean(item && (item.submission || item.submissionId || item.submitTime || item.submitted))
     },
     async handleLogout() {
       this.loggingOut = true

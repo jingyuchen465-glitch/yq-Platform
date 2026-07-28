@@ -72,7 +72,7 @@ public class LoginServiceImpl implements LoginService {
         String signSecret = createSignSecret();
 
         // 5. 构建学生详情 VO
-        StudentDetailsVO detailsVO = StudentDetailsVO.from(student);
+        StudentDetailsVO detailsVO = buildStudentDetails(student);
 
         // 6. 将登录信息保存到 Redis（TTL 与 JWT 有效期保持一致）
         LoginInfo loginInfo = new LoginInfo();
@@ -100,13 +100,20 @@ public class LoginServiceImpl implements LoginService {
     @Override
     public StudentDetailsVO getCurrentStudent() {
         LoginSession session = requireStudentSession();
-        Object value = redisTemplate.opsForValue().get(
-                TokenConstants.STUDENT_JWT_KEY_PREFIX + session.getPrincipalId()
-        );
-        if (!(value instanceof LoginInfo loginInfo) || loginInfo.getStudentDetailsVO() == null) {
-            throw BusinessException.USER_NO_TOKEN;
+        Student student = loginMapper.selectById(session.getPrincipalId());
+        if (student == null) {
+            throw BusinessException.USER_NOT_EXIST.newInstance("学生账号不存在");
         }
-        return loginInfo.getStudentDetailsVO();
+        return buildStudentDetails(student);
+    }
+
+    private StudentDetailsVO buildStudentDetails(Student student) {
+        return StudentDetailsVO.from(
+                student,
+                student.getClassId() == null
+                        ? null
+                        : loginMapper.selectStudentClassProfile(student.getClassId())
+        );
     }
 
     private LoginSession requireStudentSession() {

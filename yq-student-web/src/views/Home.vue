@@ -47,6 +47,35 @@
         </router-link>
       </section>
 
+      <section class="class-briefing" aria-labelledby="class-briefing-title">
+        <div class="class-stamp" aria-hidden="true">
+          <span>CLASS</span>
+          <strong>{{ classInitial }}</strong>
+          <small>{{ profile.classId ? `#${profile.classId}` : '待分班' }}</small>
+        </div>
+        <div class="class-overview">
+          <p class="eyebrow">MY CLASS · 班级归属</p>
+          <h2 id="class-briefing-title">{{ profile.className || '班级信息待完善' }}</h2>
+          <p>{{ classDescription }}</p>
+          <dl class="class-facts">
+            <div><dt>学习课程</dt><dd>{{ profile.courseName || '暂未配置' }}</dd></div>
+            <div><dt>所在校区</dt><dd>{{ profile.campusLocation || '暂未配置' }}</dd></div>
+          </dl>
+        </div>
+        <div class="teacher-profile">
+          <div class="teacher-avatar" aria-hidden="true">{{ teacherInitial }}</div>
+          <div class="teacher-copy">
+            <span>班主任</span>
+            <strong>{{ profile.headTeacherName || '暂未配置' }}</strong>
+            <a v-if="profile.headTeacherPhone" :href="`tel:${profile.headTeacherPhone}`">{{ profile.headTeacherPhone }}</a>
+            <small v-else>联系方式待补充</small>
+          </div>
+          <a v-if="profile.headTeacherEmail" class="teacher-mail" :href="`mailto:${profile.headTeacherEmail}`" aria-label="给班主任发送邮件">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3V6Zm1 1 8 6 8-6"/></svg>
+          </a>
+        </div>
+      </section>
+
       <section class="dashboard-grid">
         <article class="profile-card">
           <header><div><p class="eyebrow">STUDENT IDENTITY</p><h2>学生资料</h2></div><span class="record-id">#{{ profile.id || '—' }}</span></header>
@@ -103,6 +132,18 @@ export default {
     maskedPhone() {
       const phone = this.profile.phone || ''
       return /^\d{11}$/.test(phone) ? `${phone.slice(0, 3)}****${phone.slice(-4)}` : '手机号未填写'
+    },
+    classInitial() {
+      const name = this.profile.className || ''
+      return name.trim().charAt(0).toUpperCase() || 'YQ'
+    },
+    teacherInitial() {
+      const name = this.profile.headTeacherName || ''
+      return name.trim().charAt(0).toUpperCase() || '师'
+    },
+    classDescription() {
+      if (!this.profile.classId) return '完成分班后，这里会同步展示你的课程归属、所在校区和班主任联系方式。'
+      return '班级是你在 YQ 的学习坐标。课程安排、作业进度与日常通知都将围绕这里展开。'
     },
     todayCourses() {
       const today = this.dateKey(new Date())
@@ -179,6 +220,16 @@ export default {
 .rail-card h2 { font: 750 15px var(--display); }.rail-card p { margin-top: 5px; color: var(--ink-soft); font-size: 10px; }
 .rail-index { position: absolute; top: 9px; right: 12px; color: rgba(14,116,144,.16); font: 700 8px var(--mono); letter-spacing: .14em; }
 .rail-arrow { color: var(--lagoon); font-size: 20px; }.rail-homework > svg { color: #b6523b; background: #fff0ec; }.rail-orders > svg { color: #6d5a9a; background: #f0ecfa; }
+.class-briefing { min-height: 220px; display: grid; grid-template-columns: 150px minmax(0,1fr) minmax(270px,.72fr); align-items: stretch; margin-top: 22px; overflow: hidden; border: 1px solid var(--line); border-radius: 24px 8px 24px 24px; background: #fff; box-shadow: 0 18px 50px -44px rgba(16,42,67,.5); }
+.class-stamp { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; background: var(--lagoon-deep); }
+.class-stamp::after { content: ''; width: 78px; height: 78px; position: absolute; right: -39px; bottom: -39px; border: 15px solid rgba(217,243,238,.12); border-radius: 50%; }
+.class-stamp span { font: 650 9px var(--mono); letter-spacing: .22em; opacity: .55; }.class-stamp strong { margin-top: 16px; font: 800 42px/1 var(--display); }.class-stamp small { margin-top: 12px; padding: 5px 9px; border: 1px solid rgba(255,255,255,.16); border-radius: 999px; font: 9px var(--mono); opacity: .72; }
+.class-overview { align-self: center; padding: 34px 38px; }.class-overview h2 { margin-top: 8px; font: 760 clamp(24px,3vw,32px)/1.2 var(--display); letter-spacing: -.035em; }.class-overview > p:not(.eyebrow) { max-width: 570px; margin-top: 11px; color: var(--ink-soft); font-size: 12px; line-height: 1.75; }
+.class-facts { display: flex; gap: 36px; margin-top: 24px; }.class-facts div { min-width: 130px; padding-left: 13px; border-left: 2px solid var(--mint); }.class-facts dt { color: var(--ink-soft); font-size: 9px; }.class-facts dd { margin-top: 5px; font-size: 12px; font-weight: 700; }
+.teacher-profile { position: relative; display: flex; align-items: center; gap: 15px; margin: 24px 24px 24px 0; padding: 24px; border-radius: 18px 6px 18px 18px; background: var(--sky); }
+.teacher-avatar { width: 54px; height: 54px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 18px 18px 5px 18px; color: #fff; background: var(--lagoon); font: 750 20px var(--display); box-shadow: 0 12px 26px -18px rgba(7,86,107,.8); }
+.teacher-copy { min-width: 0; display: flex; flex-direction: column; }.teacher-copy span { color: var(--ink-soft); font-size: 9px; }.teacher-copy strong { margin-top: 4px; font: 750 15px var(--display); }.teacher-copy a,.teacher-copy small { margin-top: 7px; color: var(--lagoon); font-size: 10px; text-decoration: none; }.teacher-copy a:hover { text-decoration: underline; }
+.teacher-mail { width: 35px; height: 35px; flex: 0 0 auto; display: grid; place-items: center; margin-left: auto; border-radius: 50%; color: var(--lagoon); background: #fff; }.teacher-mail svg { width: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .dashboard-grid { display: grid; grid-template-columns: .9fr 1.1fr; gap: 22px; margin-top: 22px; }
 .profile-card,.today-card { min-height: 310px; padding: 30px; border: 1px solid var(--line); background: #fff; box-shadow: 0 18px 50px -44px rgba(16,42,67,.5); }
 .profile-card { border-radius: 8px 24px 24px 24px; }.today-card { border-radius: 24px 8px 24px 24px; background: var(--sky); }
@@ -191,7 +242,9 @@ export default {
 .today-list time { color: var(--lagoon-deep); font: 650 10px var(--mono); }.today-list i { width: 9px; height: 9px; position: relative; border: 2px solid var(--lagoon); border-radius: 50%; background: #fff; }
 .today-list i::after { content: ''; width: 1px; height: 43px; position: absolute; top: 9px; left: 2px; background: rgba(14,116,144,.22); }.today-list li:last-child i::after { display: none; }
 .today-list div { display: flex; flex-direction: column; }.today-list strong { font-size: 12px; }.today-list small { margin-top: 5px; color: var(--ink-soft); font-size: 10px; }
+@media (max-width: 940px) { .class-briefing { grid-template-columns: 120px 1fr; }.teacher-profile { grid-column: 1 / -1; margin: 0 22px 22px; } }
 @media (max-width: 860px) { .learning-rail { grid-template-columns: 1fr; }.dashboard-grid { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .home-content { width: min(100% - 32px,620px); padding-top: 28px; }.welcome-card { grid-template-columns: 1fr; }.route-visual { display: none; }.welcome-copy { padding: 42px 28px; } }
+@media (max-width: 560px) { .class-briefing { grid-template-columns: 1fr; }.class-stamp { min-height: 108px; flex-direction: row; gap: 13px; }.class-stamp strong,.class-stamp small { margin-top: 0; }.class-overview { padding: 28px 24px; }.class-facts { flex-direction: column; gap: 14px; }.teacher-profile { margin: 0 16px 16px; }.teacher-mail { display: none; } }
 @media (max-width: 500px) { .welcome-copy h1 { font-size: 34px; }.profile-card,.today-card { padding: 24px; }.profile-card dl { grid-template-columns: 1fr; }.rail-card { padding: 19px; } }
 </style>
