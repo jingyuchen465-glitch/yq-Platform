@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.itcjy.emp.mapper.market.MarketPrepaymentOrderMapper;
+import com.itcjy.emp.mapper.pay.OrderPaymentMapper;
 import com.itcjy.emp.pojo.entity.MarketPrepaymentOrder;
+import com.itcjy.emp.pojo.entity.OrderPayment;
 import com.itcjy.stu.pojo.VO.StudentDetailsVO;
 import com.itcjy.stu.pojo.VO.StudentPrepaymentOrderVO;
 import com.itcjy.stu.service.LoginService;
@@ -29,6 +31,7 @@ class StudentPrepaymentOrderServiceImplTest {
 
     private LoginService loginService;
     private MarketPrepaymentOrderMapper orderMapper;
+    private OrderPaymentMapper paymentMapper;
     private StudentPrepaymentOrderServiceImpl service;
 
     @BeforeEach
@@ -37,9 +40,14 @@ class StudentPrepaymentOrderServiceImplTest {
                 new MapperBuilderAssistant(new MybatisConfiguration(), "prepayment-order-test"),
                 MarketPrepaymentOrder.class
         );
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "payment-order-test"),
+                OrderPayment.class
+        );
         loginService = mock(LoginService.class);
         orderMapper = mock(MarketPrepaymentOrderMapper.class);
-        service = new StudentPrepaymentOrderServiceImpl(loginService, orderMapper);
+        paymentMapper = mock(OrderPaymentMapper.class);
+        service = new StudentPrepaymentOrderServiceImpl(loginService, orderMapper, paymentMapper);
     }
 
     @Test
@@ -57,6 +65,7 @@ class StudentPrepaymentOrderServiceImplTest {
 
         when(loginService.getCurrentStudent()).thenReturn(student);
         when(orderMapper.selectList(any(Wrapper.class))).thenReturn(List.of(order));
+        when(paymentMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
 
         List<StudentPrepaymentOrderVO> result = service.listCurrentStudentOrders();
 
@@ -70,7 +79,8 @@ class StudentPrepaymentOrderServiceImplTest {
             assertThat(item.id()).isEqualTo(27L);
             assertThat(item.productName()).isEqualTo("Java 高级课程");
             assertThat(item.productPrice()).isEqualByComparingTo("88.88");
-            assertThat(item.outTradeNo()).isEqualTo("YQPREPAY27");
+            assertThat(item.outTradeNo()).isNull();
+            assertThat(item.paymentStatus()).isNull();
         });
         verify(loginService).getCurrentStudent();
     }

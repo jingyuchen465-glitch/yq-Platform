@@ -19,6 +19,24 @@ const router = new VueRouter({
       component: () => import('@/views/Home.vue'),
       meta: { title: '学习首页' }
     },
+    {
+      path: '/schedule',
+      name: 'StudentSchedule',
+      component: () => import('@/views/Schedule.vue'),
+      meta: { title: '我的课程表' }
+    },
+    {
+      path: '/homework',
+      name: 'StudentHomework',
+      component: () => import('@/views/Homework.vue'),
+      meta: { title: '我的作业' }
+    },
+    {
+      path: '/orders',
+      name: 'StudentOrders',
+      component: () => import('@/views/Orders.vue'),
+      meta: { title: '我的订单' }
+    },
     { path: '*', redirect: '/' }
   ]
 })

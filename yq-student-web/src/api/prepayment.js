@@ -4,6 +4,6 @@ export function getCurrentStudentPrepaymentOrders() {
   return request({ url: '/stu/prepayment-orders', method: 'get' })
 }
 
-export function createAlipayTrade(data) {
-  return request({ url: '/pay/alipay/create', method: 'post', data })
+export function createAlipayTrade(prepaymentOrderId) {
+  return request({ url: `/stu/payments/${prepaymentOrderId}/alipay`, method: 'post' })
 }

@@ -22,4 +22,8 @@ public class OrderPaymentPageReq extends BasePageReq {
     @Schema(description = "支付订单状态（精确匹配）")
     @Size(max = 30, message = "状态长度不能超过30个字符")
     private String status;
+
+    @Schema(description = "Payment channel")
+    @Size(max = 32, message = "Payment channel is too long")
+    private String paymentChannel;
 }

@@ -82,6 +82,11 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
                 .orderByAsc(SysPermission::getPermissionCode);
     }
 
+    /**
+     * 更新权限状态
+     * @param id
+     * @param status
+     */
     @Override
     public void updateStatus(Long id, String status) {
         SysPermission permission = this.getById(id);

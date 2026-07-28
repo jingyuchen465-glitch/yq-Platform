@@ -8,6 +8,11 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
 app:
+  payment:
+    timeout-minutes: 30
+    timeout-topic: yq-payment-timeout
+    timeout-tag: payment-timeout
+    timeout-consumer-group: yq-payment-timeout-consumer
   alipay:
     app-id: ${ALIPAY_APP_ID:9021000165644710}
     private-key: ${ALIPAY_PRIVATE_KEY:MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCj6OjYhH1gmmjfiJpDkxCGVp3AzEnqva9p4XQi0tiO1iCCNL0ywsvgYft6uGWkuUH0mZKzMOSAPtfeZSf/n2c3RsRv3HuTmYTVqogrzRflnJMlpI4RsuMzMFKOCtdd/q4SG02F0ZrDRs9LXePyqxdQlHFd1K+ROHWH283k+WJnNsR4F8j0Sx0zlJyNhlrM1JgZN406Dd81F2srud0+Oft+/5f2qE61Mci8QuJY92xfUrtJx+Nl97ej4pqmOwIMLLakp2Kg5yeFEVhtdCoFuNRfuNgIGxVGZA+UZFLTp++li/pNpM5LmEVrjlb4JJMk1l2vTh+enXBNRh7UFbbEVCqJAgMBAAECggEAQH0tx6pxDeYSpwg+8aFWGhTQIn/+AR66emUa5WyhialTxwbq/aLIxjKm2ATe8O12tr8JifkNniubkUOpdhiIaqYsOXq9IDiBm/NpehpKcaul9WSGBQ6l94jmoj4/uBqw8CzP1nu+cWBVxOhe/CY2mRyecfVxUiitjVN88b7w6XxvfYd1bVUxiphtqfADp9drZW/Y+3HGwPyuMxF01KmTzQMwG3NDrqQozgVFOGUk5pq7l6qVSOSgoT80LhfGOxbnefux6yBH/8a9yWp+VwevRcrvGcXbuy7bpzj6S5sVyvsVQ7+I1QDGh/QxrSPCMBq7SO/zs4NkY6YeXRJ/sith5QKBgQDm5htalVxUhJ+Z5bPIFfwNid3y90P9MyX3RzB917+NpJwv8k5Drp1NE6br6Y7MZUOWsPU1MLUAK6tLytHPJ6co9d7CWgnitSgKkacL7X2BPk/BPIHKL6hpoMhdEV1nCvh64QNe3TjLM61T4nkSvmueOxapS2SfCnLpv8ehQzKyAwKBgQC1uoD2vMnNa9oxC/E3OhEcLdebmSqzgYlppjXghqbS23XuZkU44p8Xh8kiQHvxPfZM7nZbsIpkupF2VrrvVQ6eBpjuhe02WyXSOHLr+0fccYT/mIxSb2+joKmOer6PpvfFSodv9kFCrCGwOFrcbSi4m1TkpKmX6kACzP3iyMWxgwKBgQCXxnP+lCVv7QmYONR3VnQrVg+N8RlA64kuRR5L6jCg465DGgx2EuaVTrCvbAQQuRO3jzRvtUeVCB9+H6DQgakwlIXLzTGoUxox8FIU1hRki1gTljledPtIC4cJHiv+WsjAxP3ZMqNtdtedR0X8myzUgtS/ja5jmJO2sPiBOVGujwKBgCVpg+tH6nOz5HN8dehct/EJLv4Fhlj2LgfmA+l5TxbRv3GY9F9FqGL7vVij1eBQVUh5PzyZF6StFA08xbdH136I9SsFv1QVZ6/jlyUl0iF77VmBWkIOVvlktgNzGZARW6juMvvFwqGrNjRFJc+DWYLH165Kh++SdiMdeJcbpjdpAoGBAM3IyQ0j/xI6z7zLW1bWy3ebnLAk8gVxBHDWPekXdUuqe3lEuO55DSMY2J+B+gsiK04CERv47qv9A1VhSODeUnzuugPYGDXpuGdmmzfjaq9c6V8cuofJMH1nRbZS76X6XsqY3sWF0Aeq+H42p6UGP0kujggvW3+I7J30HAgESV+s}
@@ -70,3 +75,8 @@ mybatis-plus:
   global-config:
     db-config:
       id-type: auto
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAMESRV_ADDR:127.0.0.1:9876}
+  producer:
+    group: ${ROCKETMQ_PRODUCER_GROUP:yq-payment-producer}

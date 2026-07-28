@@ -5,33 +5,24 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("order_payment")
-@Schema(description = "Payment order")
-public class OrderPayment {
+@TableName("payment_timeout_outbox")
+public class PaymentTimeoutOutbox {
 
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
+
+    private Long paymentOrderId;
     private String orderNo;
-    private String studentPhone;
-    private String studentName;
-    private String productId;
-    private BigDecimal orderAmount;
-    private BigDecimal refundedAmount;
-    private Long prepaymentOrderId;
-    private String paymentChannel;
-    private String status;
-    private String channelTradeNo;
-    private LocalDateTime paySuccessTime;
     private LocalDateTime expireAt;
-    private LocalDateTime closedAt;
-    private String closeReason;
+    private String status;
+    private Integer publishAttempts;
+    private String lastError;
+    private LocalDateTime publishedAt;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

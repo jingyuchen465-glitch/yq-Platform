@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Schema(description = "支付订单响应")
+@Schema(description = "Payment order response")
 public record OrderPaymentRes(
         Long id,
         String orderNo,
@@ -15,10 +15,14 @@ public record OrderPaymentRes(
         String productId,
         BigDecimal orderAmount,
         BigDecimal refundedAmount,
-        String prepaymentOrderId,
+        Long prepaymentOrderId,
+        String paymentChannel,
         String status,
-        String uniqueOrderNo,
+        String channelTradeNo,
         LocalDateTime paySuccessTime,
+        LocalDateTime expireAt,
+        LocalDateTime closedAt,
+        String closeReason,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
@@ -32,9 +36,13 @@ public record OrderPaymentRes(
                 order.getOrderAmount(),
                 order.getRefundedAmount(),
                 order.getPrepaymentOrderId(),
+                order.getPaymentChannel(),
                 order.getStatus(),
-                order.getUniqueOrderNo(),
+                order.getChannelTradeNo(),
                 order.getPaySuccessTime(),
+                order.getExpireAt(),
+                order.getClosedAt(),
+                order.getCloseReason(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );
