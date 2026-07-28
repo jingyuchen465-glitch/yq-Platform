@@ -15,6 +15,11 @@
         <span><strong>作业</strong><small>{{ homeworkCount ? `${homeworkCount} 项待完成` : '任务中心' }}</small></span>
         <b v-if="homeworkCount" class="nav-badge">{{ homeworkCount }}</b>
       </router-link>
+      <router-link to="/exams">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5V4Zm3 4h8M8 12h5m-5 4h7M9 2v4m6-4v4"/></svg>
+        <span><strong>考试</strong><small>{{ examCount ? `${examCount} 场待完成` : '考试中心' }}</small></span>
+        <b v-if="examCount" class="nav-badge">{{ examCount }}</b>
+      </router-link>
       <router-link to="/orders">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v17l-3-2-4 2-4-2-3 2V4Zm4 5h6m-6 4h6"/></svg>
         <span><strong>订单</strong><small>{{ orderCount ? `${orderCount} 笔记录` : '课程订单' }}</small></span>
@@ -38,6 +43,7 @@ export default {
     profile: { type: Object, default: () => ({}) },
     loggingOut: { type: Boolean, default: false },
     homeworkCount: { type: Number, default: 0 },
+    examCount: { type: Number, default: 0 },
     orderCount: { type: Number, default: 0 }
   },
   computed: {
@@ -53,7 +59,7 @@ export default {
 </script>
 
 <style scoped>
-.student-header { height: 78px; position: sticky; z-index: 20; top: 0; display: grid; grid-template-columns: 210px minmax(430px, 1fr) 250px; align-items: center; padding: 0 clamp(24px, 5vw, 84px); border-bottom: 1px solid rgba(14, 116, 144, .12); background: rgba(247, 250, 252, .92); backdrop-filter: blur(16px); }
+.student-header { height: 78px; position: sticky; z-index: 20; top: 0; display: grid; grid-template-columns: 210px minmax(520px, 1fr) 250px; align-items: center; padding: 0 clamp(24px, 5vw, 84px); border-bottom: 1px solid rgba(14, 116, 144, .12); background: rgba(247, 250, 252, .92); backdrop-filter: blur(16px); }
 .brand { display: flex; align-items: center; gap: 11px; color: var(--ink); text-decoration: none; }
 .brand-mark { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 13px 13px 4px 13px; color: #fff; background: var(--lagoon); font: 800 13px var(--display); }
 .brand strong { font: 750 15px var(--display); }

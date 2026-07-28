@@ -32,6 +32,24 @@ const router = new VueRouter({
       meta: { title: '我的作业' }
     },
     {
+      path: '/exams',
+      name: 'StudentExams',
+      component: () => import('@/views/Exams.vue'),
+      meta: { title: '我的考试' }
+    },
+    {
+      path: '/exams/:examId/take',
+      name: 'StudentExamRoom',
+      component: () => import('@/views/ExamRoom.vue'),
+      meta: { title: '考试答题' }
+    },
+    {
+      path: '/exam-records/:recordId/result',
+      name: 'StudentExamResult',
+      component: () => import('@/views/ExamResult.vue'),
+      meta: { title: '答卷详情' }
+    },
+    {
       path: '/orders',
       name: 'StudentOrders',
       component: () => import('@/views/Orders.vue'),

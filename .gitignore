@@ -50,3 +50,6 @@ yarn-error.log*
 !yq-admin/src/main/resources/db/payment_order_migration.sql
 !yq-admin/src/main/resources/db/payment_refund_request_migration.sql
 !yq-admin/src/main/resources/db/course_homework_template.sql
+!yq-admin/src/main/resources/db/exam_module.sql
+!yq-admin/src/main/resources/db/exam_module_upgrade.sql
+!yq-admin/src/main/resources/db/exam_question_test_data.sql

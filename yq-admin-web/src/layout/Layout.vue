@@ -160,6 +160,16 @@ export default {
             { path: '/homework/templates', title: '作业标准管理', icon: 'el-icon-notebook-2' }
           ]
         },
+        {
+          path: '/exam',
+          title: '考试系统',
+          icon: 'el-icon-document-checked',
+          children: [
+            { path: '/exam/questions', title: '题库管理', icon: 'el-icon-collection' },
+            { path: '/exam/papers', title: '试卷管理', icon: 'el-icon-document-copy' },
+            { path: '/exam/manage', title: '考试管理', icon: 'el-icon-data-board' }
+          ]
+        },
         { path: '/teacher-schedule', title: '教师课表', icon: 'el-icon-date' },
         { path: '/class-duty', title: '值班管理', icon: 'el-icon-alarm-clock' }
       ],
@@ -175,7 +185,7 @@ export default {
       now: new Date(),
       timer: null,
       logoutLoading: false,
-      openMenus: { '/homework': true }
+      openMenus: { '/homework': true, '/exam': true }
     }
   },
   computed: {
@@ -253,18 +263,34 @@ export default {
 </script>
 
 <style scoped>
-.layout-container { height: 100%; }
+.layout-container {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
 
 /* ---------- 侧边栏 ---------- */
 .side {
   width: 218px;
+  height: 100%;
+  min-height: 0;
   flex: none;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3D594A transparent;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, .03) 0%, rgba(255, 255, 255, 0) 220px),
     var(--pine);
   color: #C7D4CC;
+}
+.side::-webkit-scrollbar { width: 6px; }
+.side::-webkit-scrollbar-track { background: transparent; }
+.side::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #3D594A;
 }
 
 .brand {
@@ -392,6 +418,7 @@ export default {
 .submenu-leave-to { opacity: 0; transform: translateY(-4px); }
 
 .side-foot {
+  flex: none;
   margin-top: auto;
   padding: 16px 22px;
   border-top: 1px solid rgba(255, 255, 255, .07);

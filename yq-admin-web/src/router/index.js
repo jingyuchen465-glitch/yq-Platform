@@ -126,6 +126,24 @@ const routes = [
         meta: { title: '学生作业批改', icon: 'el-icon-document-checked', hidden: true }
       },
       {
+        path: 'exam/questions',
+        name: 'QuestionBank',
+        component: () => import('@/views/exam/QuestionBank.vue'),
+        meta: { title: '题库管理', icon: 'el-icon-collection' }
+      },
+      {
+        path: 'exam/papers',
+        name: 'PaperManage',
+        component: () => import('@/views/exam/PaperManage.vue'),
+        meta: { title: '试卷管理', icon: 'el-icon-document-copy' }
+      },
+      {
+        path: 'exam/manage',
+        name: 'ExamManage',
+        component: () => import('@/views/exam/ExamManage.vue'),
+        meta: { title: '考试管理', icon: 'el-icon-data-board' }
+      },
+      {
         path: 'teacher-schedule',
         name: 'TeacherSchedule',
         component: () => import('@/views/schedule/TeacherSchedule.vue'),

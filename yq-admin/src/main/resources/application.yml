@@ -8,6 +8,12 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
 app:
+  exam:
+    timeout-topic: ${EXAM_TIMEOUT_TOPIC:yq-exam-timeout}
+    timeout-tag: ${EXAM_TIMEOUT_TAG:exam-timeout}
+    timeout-consumer-group: ${EXAM_TIMEOUT_CONSUMER_GROUP:yq-exam-timeout-consumer}
+    outbox-retry-delay-millis: ${EXAM_OUTBOX_RETRY_DELAY_MILLIS:60000}
+    compensation-delay-millis: ${EXAM_COMPENSATION_DELAY_MILLIS:15000}
   payment:
     timeout-minutes: 30
     timeout-topic: yq-payment-timeout

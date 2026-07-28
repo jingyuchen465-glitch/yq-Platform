@@ -3,7 +3,9 @@ spring:
     init:
       mode: always
       encoding: UTF-8
-      schema-locations: classpath:db/course_homework_template.sql
+      schema-locations:
+        - classpath:db/course_homework_template.sql
+        - classpath:db/exam_module.sql
   data:
     redis:
       host: 127.0.0.1
