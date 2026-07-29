@@ -23,6 +23,11 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 题库管理服务实现类
+ * <p>提供题目的分页查询、详情查看、创建、编辑和启停用功能，
+ * 支持按课程阶段、题型、难度、状态等多维度筛选</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class ExamQuestionServiceImpl implements IExamQuestionService {
@@ -32,9 +37,17 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
     private final SysCourseMapper courseMapper;
     private final SysCourseDetailMapper courseDetailMapper;
 
+    /**
+     * 分页查询题库题目列表
+     * <p>支持按关键词、课程、阶段、题型、难度、状态筛选</p>
+     *
+     * @param req 分页查询参数
+     * @return 题目分页结果
+     */
     @Override
     @Transactional(readOnly = true)
     public PageResult<ExamQuestionRes> page(ExamQuestionPageReq req) {
+        // 先通过课程阶段关联关系筛选出符合条件的题目ID集合
         List<Long> relationQuestionIds = findRelationQuestionIds(req);
         if (relationQuestionIds != null && relationQuestionIds.isEmpty()) {
             return new PageResult<>(0L, List.of());
@@ -54,6 +67,12 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return new PageResult<>(page.getTotal(), assemble(page.getRecords()));
     }
 
+    /**
+     * 查看题目详情（包含选项和课程阶段关联）
+     *
+     * @param id 题目ID
+     * @return 题目详情
+     */
     @Override
     @Transactional(readOnly = true)
     public ExamQuestionRes detail(Long id) {
@@ -61,6 +80,13 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return ExamQuestionRes.from(question, listOptions(id), listCourseStages(id));
     }
 
+    /**
+     * 创建题目
+     * <p>校验题型、难度、课程阶段、选项合法性，创建题目并保存关联关系</p>
+     *
+     * @param req 题目保存请求
+     * @return 创建后的题目详情
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ExamQuestionRes create(ExamQuestionSaveReq req) {
@@ -73,6 +99,14 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return detail(question.getId());
     }
 
+    /**
+     * 编辑题目
+     * <p>更新题目基本信息，删除旧的选项和课程关联后重新保存</p>
+     *
+     * @param id  题目ID
+     * @param req 题目保存请求
+     * @return 更新后的题目详情
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ExamQuestionRes update(Long id, ExamQuestionSaveReq req) {
@@ -86,6 +120,13 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return detail(id);
     }
 
+    /**
+     * 更新题目状态（启用/停用）
+     *
+     * @param id  题目ID
+     * @param req 状态请求
+     * @return 更新后的题目详情
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ExamQuestionRes updateStatus(Long id, ExamQuestionStatusReq req) {
@@ -96,6 +137,11 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return detail(id);
     }
 
+    /**
+     * 根据课程和阶段条件查找关联的题目ID集合
+     *
+     * @return 题目ID列表，无条件时返回 null 表示不限制
+     */
     private List<Long> findRelationQuestionIds(ExamQuestionPageReq req) {
         if (req.getCourseId() == null && StrUtil.isBlank(req.getStageName())) return null;
         return courseRelationMapper.selectList(Wrappers.<ExamQuestionCourse>lambdaQuery()
@@ -104,6 +150,10 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
                 .stream().map(ExamQuestionCourse::getQuestionId).distinct().toList();
     }
 
+    /**
+     * 组装题目响应列表
+     * <p>批量查询选项和课程关联，组装为完整响应</p>
+     */
     private List<ExamQuestionRes> assemble(List<ExamQuestion> questions) {
         if (questions.isEmpty()) return List.of();
         List<Long> ids = questions.stream().map(ExamQuestion::getId).toList();
@@ -119,6 +169,9 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
                 options.getOrDefault(q.getId(), List.of()), courses.getOrDefault(q.getId(), List.of()))).toList();
     }
 
+    /**
+     * 保存题目的选项和课程阶段关联关系
+     */
     private void replaceRelations(Long questionId, ExamQuestionSaveReq req) {
         if (req.options() != null) {
             req.options().forEach(item -> {
@@ -139,6 +192,12 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         });
     }
 
+    /**
+     * 校验题目保存请求的合法性
+     * <p>校验题型、难度、课程阶段存在且不重复、选择题选项和答案合法性</p>
+     *
+     * @return 标准化后的题目信息（题型、难度、答案）
+     */
     private NormalizedQuestion validate(ExamQuestionSaveReq req) {
         QuestionType type = enumValue(QuestionType.class, req.questionType(), "题型不合法");
         QuestionDifficulty difficulty = enumValue(QuestionDifficulty.class, req.difficulty(), "难度不合法");
@@ -172,6 +231,10 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         return new NormalizedQuestion(type, difficulty, answer);
     }
 
+    /**
+     * 标准化答案格式
+     * <p>判断题转为大写 TRUE/FALSE，选择题去重排序后以逗号拼接</p>
+     */
     private String normalizeAnswer(QuestionType type, String raw) {
         if (type == QuestionType.JUDGE) {
             String value = raw.trim().toUpperCase();
@@ -184,6 +247,7 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
                 .map(String::trim).filter(StrUtil::isNotBlank).distinct().sorted().collect(Collectors.joining(","));
     }
 
+    /** 填充题目实体的基本字段 */
     private void fillQuestion(ExamQuestion question, ExamQuestionSaveReq req, NormalizedQuestion normalized) {
         question.setQuestionType(normalized.type().name());
         question.setQuestionContent(req.questionContent().trim());
@@ -192,32 +256,38 @@ public class ExamQuestionServiceImpl implements IExamQuestionService {
         question.setDifficulty(normalized.difficulty().name());
     }
 
+    /** 根据ID获取题目，不存在则抛出业务异常 */
     private ExamQuestion requireQuestion(Long id) {
         ExamQuestion question = questionMapper.selectById(id);
         if (question == null) throw BusinessException.DATA_ERROR.newInstance("题目不存在");
         return question;
     }
 
+    /** 查询题目的选项列表（按排序序号升序） */
     private List<ExamQuestionOption> listOptions(Long id) {
         return optionMapper.selectList(Wrappers.<ExamQuestionOption>lambdaQuery()
                 .eq(ExamQuestionOption::getQuestionId, id).orderByAsc(ExamQuestionOption::getSortOrder));
     }
 
+    /** 查询题目的课程阶段关联列表 */
     private List<ExamQuestionCourse> listCourseStages(Long id) {
         return courseRelationMapper.selectList(Wrappers.<ExamQuestionCourse>lambdaQuery()
                 .eq(ExamQuestionCourse::getQuestionId, id).orderByAsc(ExamQuestionCourse::getCourseId)
                 .orderByAsc(ExamQuestionCourse::getStageName));
     }
 
+    /** 安全解析枚举值，解析失败抛出业务异常 */
     private <T extends Enum<T>> T enumValue(Class<T> type, String value, String message) {
         try { return Enum.valueOf(type, value.trim().toUpperCase()); }
         catch (Exception ex) { throw BusinessException.PARAMS_ERROR.newInstance(message); }
     }
 
+    /** 标准化筛选参数（去空格并转大写） */
     private String normalizeFilter(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized.toUpperCase(Locale.ROOT);
     }
 
+    /** 标准化后的题目信息（用于校验通过后填充实体） */
     private record NormalizedQuestion(QuestionType type, QuestionDifficulty difficulty, String answer) {}
 }

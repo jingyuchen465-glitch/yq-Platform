@@ -1,8 +1,34 @@
 import Vue from 'vue'
-import VueRouter from 'vue-router'
+import VueRouter, { isNavigationFailure } from 'vue-router'
 import { hasStudentSession } from '@/utils/session'
 
 Vue.use(VueRouter)
+
+// Vue Router 3 rejects the Promise returned by push/replace when a navigation
+// is redirected, duplicated or superseded by a newer navigation. Those are
+// expected control-flow results, so do not surface them as runtime errors.
+function wrapNavigationMethod(methodName) {
+  const originalMethod = VueRouter.prototype[methodName]
+  VueRouter.prototype[methodName] = function navigation(location, onResolve, onReject) {
+    if (onResolve || onReject) {
+      return originalMethod.call(this, location, onResolve, onReject)
+    }
+    return originalMethod.call(this, location).catch(error => {
+      if (isNavigationFailure(error)) return error
+      return Promise.reject(error)
+    })
+  }
+}
+
+if (!VueRouter.prototype.__yqNavigationFailureHandled) {
+  wrapNavigationMethod('push')
+  wrapNavigationMethod('replace')
+  Object.defineProperty(VueRouter.prototype, '__yqNavigationFailureHandled', {
+    value: true,
+    configurable: false,
+    enumerable: false
+  })
+}
 
 const router = new VueRouter({
   mode: 'history',

@@ -29,6 +29,10 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * 考试管理服务实现类
+ * <p>提供考试发布、分页查询、考试记录查看、主观题批改及答卷结果公布等管理端功能</p>
+ */
 @Service
 @RequiredArgsConstructor
 public class ExamManagementServiceImpl implements IExamManagementService {
@@ -41,23 +45,36 @@ public class ExamManagementServiceImpl implements IExamManagementService {
     private final SysUserMapper userMapper;
     private final StudentMapper studentMapper;
 
+    /**
+     * 发布考试
+     * <p>校验试卷、班级、监考老师合法性，为每个班级创建考试并生成学生考试记录，
+     * 发布后草稿试卷自动锁定</p>
+     *
+     * @param req 发布考试请求参数
+     * @return 发布成功的考试列表
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public List<ExamAdminRes> publish(ExamPublishReq req) {
+        // 校验最晚入场时间必须晚于开始时间
         if (!req.startTime().isBefore(req.entryDeadlineTime())) {
             throw BusinessException.PARAMS_ERROR.newInstance("最晚入场时间必须晚于开始时间");
         }
+        // 校验试卷是否存在且未归档
         ExamPaper paper = requirePaper(req.paperId());
         if (PaperStatus.ARCHIVED.name().equals(paper.getStatus())) {
             throw BusinessException.DATA_ERROR.newInstance("已归档试卷不能发布");
         }
+        // 校验监考老师是否存在
         if (req.invigilatorUserId() != null && userMapper.selectById(req.invigilatorUserId()) == null) {
             throw BusinessException.USER_NOT_EXIST.newInstance("监考老师不存在");
         }
+        // 校验班级不能重复且必须存在
         List<Long> classIds = req.classIds().stream().distinct().toList();
         if (classIds.size() != req.classIds().size()) throw BusinessException.DATA_EXIST.newInstance("班级不能重复");
         List<SysClass> classes = classMapper.selectBatchIds(classIds);
         if (classes.size() != classIds.size()) throw BusinessException.CLAZZ_NOT_EXIST;
+        // 校验班级所属课程与试卷课程一致
         classes.forEach(clazz -> {
             if (!paper.getCourseId().equals(clazz.getCourseId())) {
                 throw BusinessException.DATA_ERROR.newInstance("班级课程与试卷课程不一致: " + clazz.getClassPeriod());
@@ -65,15 +82,18 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         });
         LoginSession session = AuthThreadlocal.getLoginInfo();
         Long operatorId = session == null ? null : session.getPrincipalId();
+        // 计算考试关闭时间 = 最晚入场时间 + 考试时长
         LocalDateTime closeTime = req.entryDeadlineTime().plusMinutes(req.durationMinutes());
         List<Long> examIds = new ArrayList<>();
         try {
+            // 为每个班级创建考试并生成学生考试记录
             for (Long classId : classIds) {
                 Exam exam = new Exam();
                 exam.setPaperId(paper.getId()); exam.setClassId(classId); exam.setStartTime(req.startTime());
                 exam.setEntryDeadlineTime(req.entryDeadlineTime()); exam.setDurationMinutes(req.durationMinutes());
                 exam.setCloseTime(closeTime); exam.setInvigilatorUserId(req.invigilatorUserId());
                 exam.setAnswerVisible(false); exam.setCreatedBy(operatorId); examMapper.insert(exam);
+                // 查询班级下所有在籍学生，为每人创建考试记录
                 List<Student> students = studentMapper.selectList(Wrappers.<Student>lambdaQuery()
                         .eq(Student::getClassId, classId).ne(Student::getStatus, Student.WITCHDRAWAL));
                 for (Student student : students) {
@@ -89,12 +109,19 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         } catch (DuplicateKeyException ex) {
             throw BusinessException.DATA_EXIST.newInstance("相同试卷、班级和开始时间的考试已发布");
         }
+        // 草稿试卷发布后自动锁定，防止再修改
         if (PaperStatus.DRAFT.name().equals(paper.getStatus())) {
             paper.setStatus(PaperStatus.LOCKED.name()); paperMapper.updateById(paper);
         }
         return examIds.stream().map(this::detail).toList();
     }
 
+    /**
+     * 分页查询考试列表
+     *
+     * @param req 分页查询参数（支持按试卷、班级、开始时间范围筛选）
+     * @return 考试分页结果
+     */
     @Override
     @Transactional(readOnly = true)
     public PageResult<ExamAdminRes> page(ExamPageReq req) {
@@ -108,6 +135,12 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         return new PageResult<>(page.getTotal(), assemble(page.getRecords()));
     }
 
+    /**
+     * 查看考试详情
+     *
+     * @param id 考试ID
+     * @return 考试详情（包含考生统计信息）
+     */
     @Override
     @Transactional(readOnly = true)
     public ExamAdminRes detail(Long id) {
@@ -115,6 +148,13 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         return assemble(List.of(exam)).get(0);
     }
 
+    /**
+     * 分页查询某场考试的学生考试记录
+     *
+     * @param examId 考试ID
+     * @param req    分页查询参数（支持按学生姓名、考试状态、批改状态筛选）
+     * @return 学生考试记录分页结果
+     */
     @Override
     @Transactional(readOnly = true)
     public PageResult<ExamRecordRes> records(Long examId, ExamRecordPageReq req) {
@@ -143,6 +183,13 @@ public class ExamManagementServiceImpl implements IExamManagementService {
                 .map(record -> ExamRecordRes.from(record, students.get(record.getStudentId()))).toList());
     }
 
+    /**
+     * 查看主观题批改详情
+     * <p>查询指定考试记录中所有填空题和简答题的作答情况</p>
+     *
+     * @param recordId 考试记录ID
+     * @return 批改详情（包含学生信息和主观题答案列表）
+     */
     @Override
     @Transactional(readOnly = true)
     public ExamGradingRes gradingDetail(Long recordId) {
@@ -161,13 +208,23 @@ public class ExamManagementServiceImpl implements IExamManagementService {
                 .map(answer -> ExamGradingRes.SubjectiveAnswer.from(answer, questions.get(answer.getPaperQuestionId()))).toList());
     }
 
+    /**
+     * 批改主观题
+     * <p>对指定考试记录中的主观题进行评分，自动汇总主观题得分并更新批改状态</p>
+     *
+     * @param recordId 考试记录ID
+     * @param req      批改请求（包含每道题的得分和评语）
+     * @return 批改后的详情
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ExamGradingRes grade(Long recordId, ExamGradeReq req) {
         StudentExamRecord record = requireRecord(recordId);
+        // 未提交的考试不能批改
         if (ExamRecordStatus.NOT_STARTED.name().equals(record.getStatus()) || ExamRecordStatus.IN_PROGRESS.name().equals(record.getStatus())) {
             throw BusinessException.DATA_ERROR.newInstance("考试尚未提交，不能批改");
         }
+        // 查询该记录的所有主观题答案
         Map<Long, StudentExamAnswer> answers = answerMapper.selectList(Wrappers.<StudentExamAnswer>lambdaQuery()
                         .eq(StudentExamAnswer::getRecordId, recordId)
                         .in(StudentExamAnswer::getQuestionType, QuestionType.FILL.name(), QuestionType.SHORT.name()))
@@ -175,6 +232,7 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         LoginSession session = AuthThreadlocal.getLoginInfo();
         Long graderId = session == null ? null : session.getPrincipalId();
         LocalDateTime now = LocalDateTime.now();
+        // 逐题评分并校验得分不超过题目分值
         for (ExamGradeReq.AnswerGrade grade : req.answers()) {
             StudentExamAnswer answer = answers.get(grade.answerId());
             if (answer == null) throw BusinessException.DATA_ERROR.newInstance("批改答案不属于该考试记录");
@@ -184,11 +242,13 @@ public class ExamManagementServiceImpl implements IExamManagementService {
             answer.setScore(grade.score()); answer.setGraderComment(StrUtil.trim(grade.comment()));
             answer.setGraderUserId(graderId); answer.setGradedAt(now); answerMapper.updateById(answer);
         }
+        // 重新查询主观题答案，汇总主观题总分
         List<StudentExamAnswer> subjectiveAnswers = answerMapper.selectList(Wrappers.<StudentExamAnswer>lambdaQuery()
                 .eq(StudentExamAnswer::getRecordId, recordId)
                 .in(StudentExamAnswer::getQuestionType, QuestionType.FILL.name(), QuestionType.SHORT.name()));
         BigDecimal subjectiveScore = subjectiveAnswers.stream().map(StudentExamAnswer::getScore)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 判断是否所有主观题均已批改完成
         boolean completed = subjectiveAnswers.stream().allMatch(answer -> answer.getScore() != null);
         record.setSubjectiveScore(subjectiveScore);
         record.setScore(record.getObjectiveScore().add(subjectiveScore));
@@ -197,10 +257,19 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         return gradingDetail(recordId);
     }
 
+    /**
+     * 更新答卷结果可见性
+     * <p>考试关闭后才能公布结果，公布后学生可查看自己的答卷</p>
+     *
+     * @param examId 考试ID
+     * @param req    可见性请求（是否公布）
+     * @return 更新后的考试详情
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ExamAdminRes updateVisibility(Long examId, ExamVisibilityReq req) {
         Exam exam = requireExam(examId);
+        // 考试关闭前不允许公布结果
         if (LocalDateTime.now().isBefore(exam.getCloseTime())) {
             throw BusinessException.DATA_ERROR.newInstance("整场考试关闭后才能公布答卷结果");
         }
@@ -210,6 +279,10 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         return detail(examId);
     }
 
+    /**
+     * 组装考试管理端响应列表
+     * <p>批量查询试卷、班级、考生记录，统计各状态人数</p>
+     */
     private List<ExamAdminRes> assemble(List<Exam> exams) {
         if (exams.isEmpty()) return List.of();
         List<Long> examIds = exams.stream().map(Exam::getId).toList();
@@ -235,27 +308,33 @@ public class ExamManagementServiceImpl implements IExamManagementService {
         }).toList();
     }
 
+    /** 统计指定考试状态的考生人数 */
     private long count(List<StudentExamRecord> records, String status) {
         return records.stream().filter(item -> status.equals(item.getStatus())).count();
     }
+    /** 统计指定批改状态的考生人数（支持多状态） */
     private long countGrading(List<StudentExamRecord> records, String... statuses) {
         Set<String> values = Set.of(statuses);
         return records.stream().filter(item -> values.contains(item.getGradingStatus())).count();
     }
+    /** 标准化筛选参数（去空格并转大写） */
     private String normalizeFilter(String value) {
         String normalized = StrUtil.trim(value);
         return StrUtil.isBlank(normalized) ? null : normalized.toUpperCase(Locale.ROOT);
     }
+    /** 根据ID获取考试，不存在则抛出业务异常 */
     private Exam requireExam(Long id) {
         Exam exam = examMapper.selectById(id);
         if (exam == null) throw BusinessException.DATA_ERROR.newInstance("考试不存在");
         return exam;
     }
+    /** 根据ID获取试卷，不存在则抛出业务异常 */
     private ExamPaper requirePaper(Long id) {
         ExamPaper paper = paperMapper.selectById(id);
         if (paper == null) throw BusinessException.DATA_ERROR.newInstance("试卷不存在");
         return paper;
     }
+    /** 根据ID获取考试记录，不存在则抛出业务异常 */
     private StudentExamRecord requireRecord(Long id) {
         StudentExamRecord record = recordMapper.selectById(id);
         if (record == null) throw BusinessException.DATA_ERROR.newInstance("考试记录不存在");

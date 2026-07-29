@@ -25,7 +25,7 @@ app:
     alipay-public-key: ${ALIPAY_PUBLIC_KEY:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArBGceYzvJoZaYgZydivsYs4q27QpeIyPeJnNmK6k1JqIFBhxgl62SKklHH50ypMb1jt/bpFLdTU3fI1xTAFsW1mjdyXwqEWjP3vuFD7uiEY3j3RHDId5eH0I66/mRc9DhWMfagHFfmobknWOp7/4ME53otMXCHegBSJd8SkpAKtVbKbLIGADRPNpntUEYxtKKa0H+t604/eDtC39eL0x+NsAl5PTgdvvDAxflQI+qqEFQlgTF7tGF6EAFc6yn7adsWhNWnMRER8VT06s/WmxSTKqVanM5gs74Gs4e7AMladnEZTNrEfmLG3DaSLjOWeNtso3j2zxjsu6WXMELuM2KwIDAQAB}
     server-url: ${ALIPAY_SERVER_URL:https://openapi-sandbox.dl.alipaydev.com/gateway.do}
     notify-url: ${ALIPAY_NOTIFY_URL:http://f34ac67b.natappfree.cc/yq-admin/pay/alipay/notify}
-    return-url: ${ALIPAY_RETURN_URL:http://localhost:5174/}
+    return-url: ${ALIPAY_RETURN_URL:http://localhost:5174}
     sign-type: RSA2
     charset: UTF-8
     format: json

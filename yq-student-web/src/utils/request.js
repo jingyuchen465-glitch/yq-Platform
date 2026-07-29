@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
+import { notifyStudentAuthExpired } from '@/utils/authEvents'
 import { buildQueryString, buildRequestSign } from '@/utils/sign'
 import {
   clearStudentSession,
@@ -35,7 +36,7 @@ function redirectToLogin() {
   const redirect = router.currentRoute.path === '/login' ? null : router.currentRoute.fullPath
   clearStudentSession()
   if (router.currentRoute.path !== '/login') {
-    router.replace({ path: '/login', query: redirect ? { redirect } : {} })
+    notifyStudentAuthExpired(redirect)
   }
 }
 

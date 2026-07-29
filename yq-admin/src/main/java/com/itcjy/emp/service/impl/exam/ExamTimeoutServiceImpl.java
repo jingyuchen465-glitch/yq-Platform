@@ -22,10 +22,16 @@ import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
 
+/**
+ * 考试超时服务实现类
+ * <p>基于 RocketMQ 延时消息 + 事务性发件箱模式实现考试超时自动交卷，
+ * 并通过定时任务进行消息重发和过期记录补偿</p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExamTimeoutServiceImpl implements IExamTimeoutService {
+    /** RocketMQ 消息发送超时时间（毫秒） */
     private static final int SEND_TIMEOUT_MILLIS = 3000;
     private final ExamTimeoutOutboxMapper outboxMapper;
     private final StudentExamRecordMapper recordMapper;
@@ -34,9 +40,17 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
     private final ExamProperties properties;
     private final IExamSubmissionService submissionService;
 
+    /**
+     * 调度超时交卷任务
+     * <p>在事务内写入发件箱记录，事务提交后立即尝试发送延时消息</p>
+     *
+     * @param recordId     考试记录ID
+     * @param deadlineTime 答题截止时间
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void schedule(Long recordId, LocalDateTime deadlineTime) {
+        // 幂等性检查：同一记录只创建一条发件箱记录
         if (!outboxMapper.exists(Wrappers.<ExamTimeoutOutbox>lambdaQuery()
                 .eq(ExamTimeoutOutbox::getRecordId, recordId))) {
             ExamTimeoutOutbox outbox = new ExamTimeoutOutbox();
@@ -44,6 +58,7 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
             outbox.setStatus(ExamTimeoutOutboxStatus.PENDING.name()); outbox.setPublishAttempts(0);
             outboxMapper.insert(outbox);
         }
+        // 事务提交后再发送消息，避免事务回滚但消息已发出
         Runnable publish = () -> publishPendingForRecord(recordId);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -52,6 +67,12 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
         } else publish.run();
     }
 
+    /**
+     * 发布指定记录的待发送超时消息
+     * <p>发送成功则更新状态为 SENT，失败则记录错误信息并增加重试次数</p>
+     *
+     * @param recordId 考试记录ID
+     */
     @Override
     public void publishPendingForRecord(Long recordId) {
         ExamTimeoutOutbox outbox = outboxMapper.selectOne(Wrappers.<ExamTimeoutOutbox>lambdaQuery()
@@ -77,18 +98,32 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
         }
     }
 
+    /**
+     * 处理超时消息（由 RocketMQ 消费者调用）
+     * <p>若考试仍在进行中且未到截止时间，则重新发送延时消息（分段延时）；
+     * 若已到截止时间则执行超时交卷</p>
+     *
+     * @param message 超时消息
+     */
     @Override
     public void handle(ExamTimeoutMessage message) {
         StudentExamRecord record = recordMapper.selectById(message.recordId());
+        // 只处理进行中的考试
         if (record == null || !ExamRecordStatus.IN_PROGRESS.name().equals(record.getStatus())) return;
         LocalDateTime deadline = record.getDeadlineTime();
+        // 未到截止时间，继续发送下一段延时消息
         if (deadline != null && LocalDateTime.now().isBefore(deadline)) {
             sendSegment(new ExamTimeoutMessage(record.getId(), deadline));
             return;
         }
+        // 已到截止时间，执行超时自动交卷
         submissionService.submit(record.getId(), ExamSubmitReason.TIMEOUT);
     }
 
+    /**
+     * 定时重发待发送的发件箱消息
+     * <p>防止因网络异常等原因导致消息发送失败，每次最多处理 100 条</p>
+     */
     @Scheduled(fixedDelayString = "${app.exam.outbox-retry-delay-millis:60000}")
     public void republishPending() {
         outboxMapper.selectList(Wrappers.<ExamTimeoutOutbox>lambdaQuery()
@@ -97,14 +132,21 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
                 .forEach(item -> publishPendingForRecord(item.getRecordId()));
     }
 
+    /**
+     * 定时补偿过期记录
+     * <p>1. 将已超过截止时间但仍在进行中的考试记录执行超时交卷；
+     * 2. 将已过最晚入场时间且未开始的考试记录标记为缺考</p>
+     */
     @Scheduled(fixedDelayString = "${app.exam.compensation-delay-millis:15000}")
     public void compensateExpiredRecords() {
         LocalDateTime now = LocalDateTime.now();
+        // 补偿已超过截止时间的进行中记录
         recordMapper.selectList(Wrappers.<StudentExamRecord>lambdaQuery()
                         .eq(StudentExamRecord::getStatus, ExamRecordStatus.IN_PROGRESS.name())
                         .le(StudentExamRecord::getDeadlineTime, now).last("LIMIT 200"))
                 .forEach(record -> submissionService.submit(record.getId(), ExamSubmitReason.TIMEOUT));
 
+        // 将已过最晚入场时间的未开始记录标记为缺考
         List<Long> closedEntryExamIds = examMapper.selectList(Wrappers.<Exam>lambdaQuery()
                         .select(Exam::getId).lt(Exam::getEntryDeadlineTime, now))
                 .stream().map(Exam::getId).toList();
@@ -122,6 +164,10 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
         }
     }
 
+    /**
+     * 发送分段延时消息到 RocketMQ
+     * <p>根据剩余时间选择合适的延时等级，通过多次分段投递逼近精确超时</p>
+     */
     private void sendSegment(ExamTimeoutMessage message) {
         int delayLevel = resolveDelayLevel(Duration.between(LocalDateTime.now(), message.deadlineTime()));
         SendResult result = rocketMQTemplate.syncSend(
@@ -131,6 +177,13 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
                 message.recordId(), delayLevel, result.getMsgId());
     }
 
+    /**
+     * 根据剩余时间解析 RocketMQ 延时等级
+     * <p>RocketMQ 延时等级对应: 1s 5s 10s 30s 1m 2m 3m 4m 5m 6m 7m 8m 9m 10m 20m 30m 1h 2h</p>
+     *
+     * @param remaining 剩余时间
+     * @return 延时等级（1-18）
+     */
     static int resolveDelayLevel(Duration remaining) {
         long seconds = Math.max(1, remaining.getSeconds());
         if (seconds >= 7200) return 18;
@@ -153,6 +206,7 @@ public class ExamTimeoutServiceImpl implements IExamTimeoutService {
         return 1;
     }
 
+    /** 截断错误信息，最多保留 500 字符 */
     private String abbreviate(String value) {
         if (value == null) return "Unknown RocketMQ publish failure";
         return value.length() <= 500 ? value : value.substring(0, 500);
